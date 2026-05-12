@@ -81,9 +81,9 @@ function Read-Utf8 {
     return [System.IO.File]::ReadAllText($Path)
 }
 
-# -----------------------------------------------------------------------------
+
 # Step 1 — Validate arguments
-# -----------------------------------------------------------------------------
+
 Write-Step 1 "Validating arguments"
 
 if ($Mode -eq 'existing-unity') {
@@ -115,9 +115,9 @@ Write-Info "TargetPath:  $TargetPath"
 Write-Info "ProjectName: $ProjectName"
 Write-Info "Force:       $Force"
 
-# -----------------------------------------------------------------------------
+
 # Step 2 — Resolve source repo and validate
-# -----------------------------------------------------------------------------
+
 Write-Step 2 "Resolving source repository"
 
 $SourceRoot = Split-Path -Parent $PSScriptRoot
@@ -137,9 +137,9 @@ foreach ($rel in $requiredSourcePaths) {
 }
 Write-Info "Source root: $SourceRoot"
 
-# -----------------------------------------------------------------------------
+
 # Step 3 — Copy .claude/ recursively
-# -----------------------------------------------------------------------------
+
 Write-Step 3 "Copying .claude/ -> $TargetPath\.claude\"
 try {
     Copy-Item -Path (Join-Path $SourceRoot '.claude') -Destination $TargetPath -Recurse -Force
@@ -147,9 +147,9 @@ try {
     Fail 3 "$SourceRoot\.claude" "Copy failed: $($_.Exception.Message)"
 }
 
-# -----------------------------------------------------------------------------
+
 # Step 4 — Copy CLAUDE.md
-# -----------------------------------------------------------------------------
+
 Write-Step 4 "Copying CLAUDE.md"
 try {
     Copy-Item -Path (Join-Path $SourceRoot 'CLAUDE.md') -Destination (Join-Path $TargetPath 'CLAUDE.md') -Force
@@ -157,9 +157,9 @@ try {
     Fail 4 "$SourceRoot\CLAUDE.md" "Copy failed: $($_.Exception.Message)"
 }
 
-# -----------------------------------------------------------------------------
+
 # Step 5 — Copy Unity/ recursively
-# -----------------------------------------------------------------------------
+
 Write-Step 5 "Copying Unity/ -> $TargetPath\Unity\"
 try {
     Copy-Item -Path (Join-Path $SourceRoot 'Unity') -Destination $TargetPath -Recurse -Force
@@ -167,9 +167,9 @@ try {
     Fail 5 "$SourceRoot\Unity" "Copy failed: $($_.Exception.Message)"
 }
 
-# -----------------------------------------------------------------------------
+
 # Step 6 — Copy docs/architecture/ -> CCGS/Docs/architecture/
-# -----------------------------------------------------------------------------
+
 Write-Step 6 "Copying docs/architecture/ -> $TargetPath\CCGS\Docs\architecture\"
 $targetArchDir = Join-Path $TargetPath 'CCGS\Docs\architecture'
 try {
@@ -179,9 +179,9 @@ try {
     Fail 6 $targetArchDir "Copy failed: $($_.Exception.Message)"
 }
 
-# -----------------------------------------------------------------------------
+
 # Step 7 — Copy docs/engine-reference/unity/ -> CCGS/Docs/engine-reference/unity/
-# -----------------------------------------------------------------------------
+
 Write-Step 7 "Copying docs/engine-reference/unity/ -> $TargetPath\CCGS\Docs\engine-reference\unity\"
 $targetEngineDir = Join-Path $TargetPath 'CCGS\Docs\engine-reference\unity'
 try {
@@ -191,9 +191,9 @@ try {
     Fail 7 $targetEngineDir "Copy failed: $($_.Exception.Message)"
 }
 
-# -----------------------------------------------------------------------------
+
 # Step 8 — Copy README-branch.md -> CCGS/Docs/README-branch.md
-# -----------------------------------------------------------------------------
+
 Write-Step 8 "Copying README-branch.md -> $TargetPath\CCGS\Docs\README-branch.md"
 try {
     Copy-Item -Path (Join-Path $SourceRoot 'README-branch.md') -Destination (Join-Path $TargetPath 'CCGS\Docs\README-branch.md') -Force
@@ -201,9 +201,9 @@ try {
     Fail 8 "$SourceRoot\README-branch.md" "Copy failed: $($_.Exception.Message)"
 }
 
-# -----------------------------------------------------------------------------
+
 # Step 9 — Create CCGS skeleton (.gitkeep directories)
-# -----------------------------------------------------------------------------
+
 Write-Step 9 "Creating CCGS/ skeleton"
 
 $ccgsSkeleton = @(
@@ -238,18 +238,16 @@ foreach ($rel in $ccgsSkeleton) {
     try {
         New-Item -ItemType Directory -Path $dir -Force | Out-Null
         $keep = Join-Path $dir '.gitkeep'
-        if (-not (Test-Path $keep)) {
-            Write-Utf8NoBom -Path $keep -Content ''
-        }
+        Write-Utf8NoBom -Path $keep -Content ''
     } catch {
         Fail 9 $dir "Skeleton creation failed: $($_.Exception.Message)"
     }
 }
 Write-Info "Created $($ccgsSkeleton.Count) directories with .gitkeep markers"
 
-# -----------------------------------------------------------------------------
+
 # Step 10 — Path-rewrite pass on .claude/ and CLAUDE.md
-# -----------------------------------------------------------------------------
+
 Write-Step 10 "Rewriting framework path references"
 
 # Ordered: most-specific first so catch-alls don't pre-empt narrower matches.
@@ -294,7 +292,9 @@ $sourceCodeRewrites = @(
     @{ Pattern = '\bassets/';          Replacement = 'Unity/Assets/' }
 )
 
-$allRewrites = $projectContentRewrites + $sourceCodeRewrites
+$allRewrites = ($projectContentRewrites + $sourceCodeRewrites) | ForEach-Object {
+    [PSCustomObject]@{ Regex = [regex]::new($_.Pattern); Replacement = $_.Replacement }
+}
 
 # Files to rewrite: .claude/** of given extensions + CLAUDE.md.
 $rewriteExtensions = @('.md', '.sh', '.yaml', '.yml', '.json')
@@ -315,14 +315,15 @@ foreach ($file in $candidateFiles) {
         $content = $original
 
         # Pre-pass safety substitution for files under .claude/docs/.
-        $isInClaudeDocs = $file.FullName.StartsWith((Join-Path $claudeDir 'docs'), [System.StringComparison]::OrdinalIgnoreCase)
+        $claudeDocsDir = (Join-Path $claudeDir 'docs') + '\'
+        $isInClaudeDocs = $file.FullName.StartsWith($claudeDocsDir, [System.StringComparison]::OrdinalIgnoreCase)
         if ($isInClaudeDocs) {
             $content = $content.Replace('.claude/docs/', $sentinel)
         }
 
         # Apply rewrites in order.
         foreach ($r in $allRewrites) {
-            $content = [regex]::Replace($content, $r.Pattern, $r.Replacement)
+            $content = $r.Regex.Replace($content, $r.Replacement)
         }
 
         # Restore sentinel.
@@ -341,9 +342,9 @@ foreach ($file in $candidateFiles) {
 }
 Write-Info "Inspected $touchedCount files; rewrote $rewrittenCount"
 
-# -----------------------------------------------------------------------------
+
 # Step 11 — Customize CLAUDE.md H1
-# -----------------------------------------------------------------------------
+
 Write-Step 11 "Customizing CLAUDE.md H1 for '$ProjectName'"
 
 $claudePath = Join-Path $TargetPath 'CLAUDE.md'
@@ -357,9 +358,9 @@ try {
     Fail 11 $claudePath "Customization failed: $($_.Exception.Message)"
 }
 
-# -----------------------------------------------------------------------------
+
 # Step 12 — Print Next Steps
-# -----------------------------------------------------------------------------
+
 Write-Host ""
 Write-Host "================================================================" -ForegroundColor Green
 Write-Host "  Deployment complete: $ProjectName" -ForegroundColor Green
