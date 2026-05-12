@@ -1,0 +1,6 @@
+{
+    "name": "PlayModeTests",
+    "precompiledReferences": ["nunit.framework.dll"],
+    "defineConstraints": ["UNITY_INCLUDE_TESTS"],
+    "autoReferenced": false
+}

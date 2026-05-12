@@ -1,0 +1,48 @@
+# Unity-generated
+Library/
+Temp/
+Obj/
+Build/
+Builds/
+Logs/
+UserSettings/
+MemoryCaptures/
+
+# IDE-generated
+*.csproj
+*.unityproj
+*.sln
+*.suo
+*.tmp
+*.user
+*.userprefs
+*.pidb
+*.booproj
+*.svd
+*.pdb
+*.mdb
+*.opendb
+*.VC.db
+
+# Visual Studio / Rider / VS Code
+.vs/
+.idea/
+.vscode/
+
+# Asset meta-files for ignored dirs
+Library.meta
+Temp.meta
+Logs.meta
+UserSettings.meta
+
+# WebGL build artefacts
+*.bc
+
+# WeChat Mini Game transform output
+WeChatGameOutput/
+WeChatProject/
+
+# Crashlytics / asset bundles
+*.unitypackage
+crashlytics-build.properties
+sysinfo.txt
