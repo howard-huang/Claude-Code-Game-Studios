@@ -202,9 +202,27 @@ try {
 }
 
 
-# Step 9 — Create CCGS skeleton (.gitkeep directories)
+# Step 9 — Copy root-level docs/*.md files -> CCGS/Docs/
 
-Write-Step 9 "Creating CCGS/ skeleton"
+Write-Step 9 "Copying root-level docs/*.md -> $TargetPath\CCGS\Docs\"
+$targetDocsDir = Join-Path $TargetPath 'CCGS\Docs'
+$sourceDocs = Get-ChildItem -Path (Join-Path $SourceRoot 'docs') -File -Filter '*.md' -ErrorAction SilentlyContinue
+try {
+    foreach ($doc in $sourceDocs) {
+        Copy-Item -Path $doc.FullName -Destination $targetDocsDir -Force
+        Write-Info "  $($doc.Name)"
+    }
+    if (-not $sourceDocs) {
+        Write-Info "  (no root-level .md files found)"
+    }
+} catch {
+    Fail 9 $targetDocsDir "Copy failed: $($_.Exception.Message)"
+}
+
+
+# Step 10 — Create CCGS skeleton (.gitkeep directories)
+
+Write-Step 10 "Creating CCGS/ skeleton"
 
 $ccgsSkeleton = @(
     'CCGS\Design\gdd',
@@ -240,15 +258,15 @@ foreach ($rel in $ccgsSkeleton) {
         $keep = Join-Path $dir '.gitkeep'
         Write-Utf8NoBom -Path $keep -Content ''
     } catch {
-        Fail 9 $dir "Skeleton creation failed: $($_.Exception.Message)"
+        Fail 10 $dir "Skeleton creation failed: $($_.Exception.Message)"
     }
 }
 Write-Info "Created $($ccgsSkeleton.Count) directories with .gitkeep markers"
 
 
-# Step 10 — Path-rewrite pass on .claude/ and CLAUDE.md
+# Step 11 — Path-rewrite pass on .claude/ and CLAUDE.md
 
-Write-Step 10 "Rewriting framework path references"
+Write-Step 11 "Rewriting framework path references"
 
 # Ordered: most-specific first so catch-alls don't pre-empt narrower matches.
 $projectContentRewrites = @(
@@ -259,6 +277,10 @@ $projectContentRewrites = @(
     @{ Pattern = '\bdesign/registry/';             Replacement = 'CCGS/Design/registry/' }
     @{ Pattern = '\bdesign/concepts/';             Replacement = 'CCGS/Design/concepts/' }
     @{ Pattern = '\bdesign/';                      Replacement = 'CCGS/Design/' }
+    # Individual docs/ files (before subdirectory patterns so they match first)
+    @{ Pattern = '\bdocs/CLAUDE.md';                             Replacement = 'CCGS/Docs/CLAUDE.md' }
+    @{ Pattern = '\bdocs/COLLABORATIVE-DESIGN-PRINCIPLE.md';     Replacement = 'CCGS/Docs/COLLABORATIVE-DESIGN-PRINCIPLE.md' }
+    @{ Pattern = '\bdocs/WORKFLOW-GUIDE.md';                     Replacement = 'CCGS/Docs/WORKFLOW-GUIDE.md' }
     @{ Pattern = '\bdocs/architecture/';           Replacement = 'CCGS/Docs/architecture/' }
     @{ Pattern = '\bdocs/engine-reference/';       Replacement = 'CCGS/Docs/engine-reference/' }
     @{ Pattern = '\bdocs/api/';                    Replacement = 'CCGS/Docs/api/' }
@@ -337,15 +359,15 @@ foreach ($file in $candidateFiles) {
         }
         $touchedCount++
     } catch {
-        Fail 10 $file.FullName "Rewrite failed: $($_.Exception.Message)"
+        Fail 11 $file.FullName "Rewrite failed: $($_.Exception.Message)"
     }
 }
 Write-Info "Inspected $touchedCount files; rewrote $rewrittenCount"
 
 
-# Step 11 — Customize CLAUDE.md H1
+# Step 12 — Customize CLAUDE.md H1
 
-Write-Step 11 "Customizing CLAUDE.md H1 for '$ProjectName'"
+Write-Step 12 "Customizing CLAUDE.md H1 for '$ProjectName'"
 
 $claudePath = Join-Path $TargetPath 'CLAUDE.md'
 try {
@@ -355,11 +377,11 @@ try {
     $content = $content -replace '(?m)^#\s+Claude Code Game Studios.*$', $newH1
     Write-Utf8NoBom -Path $claudePath -Content $content
 } catch {
-    Fail 11 $claudePath "Customization failed: $($_.Exception.Message)"
+    Fail 12 $claudePath "Customization failed: $($_.Exception.Message)"
 }
 
 
-# Step 12 — Print Next Steps
+# Step 13 — Print Next Steps
 
 Write-Host ""
 Write-Host "================================================================" -ForegroundColor Green
@@ -391,9 +413,9 @@ Write-Host "     engine (Unity China fork, Unity 2022 base). If it refuses to lo
 Write-Host "     either switch to Tuanjie or pin to an older WX-SDK that supports" -ForegroundColor Yellow
 Write-Host "     pure Unity 2021." -ForegroundColor Yellow
 Write-Host ""
-Write-Host "  4. Review the 6 ADRs (all Status=Proposed):" -ForegroundColor White
+Write-Host "  4. Review the 6 ADRs under:" -ForegroundColor White
 Write-Host "       $TargetPath\CCGS\Docs\architecture\" -ForegroundColor Gray
-Write-Host "     Update Status to Accepted when you sign off." -ForegroundColor Gray
+Write-Host "     All 6 are Accepted — review and update for your project specifics." -ForegroundColor Gray
 Write-Host ""
 Write-Host "  5. Launch Claude Code from the project root:" -ForegroundColor White
 Write-Host "       cd `"$TargetPath`"" -ForegroundColor Gray
