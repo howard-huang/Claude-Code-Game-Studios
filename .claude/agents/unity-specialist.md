@@ -21,12 +21,14 @@ via `minigame-tuanjie-transform-sdk`. Cross-reference
 - **JIT blocked** — REFUSE `System.Reflection.Emit.*`, `Regex.Compile`,
   `RegexOptions.Compiled`, dynamic IL generation.
 - **No `Resources.Load` / `Resources/` folder** — assets load via WeChat SubPackages
-  (ADR-0003). Redirect any `Resources.Load` suggestion to `wx.loadSubpackage` +
-  scene-bundled references.
+  (ADR-0003). Redirect any `Resources.Load` suggestion to `Wx.LoadSubpackage` Facade
+  (ADR-0001) + scene-bundled references.
 - **DOTS forbidden** — REFUSE to spawn `unity-dots-specialist`. Recommend classic
   MonoBehaviour + ScriptableObject patterns instead.
 - **Addressables forbidden** — REFUSE to spawn `unity-addressables-specialist` for
   asset-loading work. Redirect to ADR-0003.
+- **`using WeChatWASM;` outside `Unity/Assets/Scripts/Core/Platform/`** — REFUSE.
+  All gameplay must call the `Wx` Facade (ADR-0001), never the SDK directly.
 - **Built-in RP default** — URP is supported (ADR-0004) but Phase 2 only; do not
   recommend SRP migration without explicit user opt-in.
 - **`async/await` forbidden on hot paths** — coroutines + event-driven flow only.

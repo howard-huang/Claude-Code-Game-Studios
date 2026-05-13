@@ -23,8 +23,8 @@ Proposed
 WeChat Mini Game enforces a 4 MB hard cap on the first package downloaded at
 game-launch, 4 MB per subpackage, and 20 MB total. This ADR makes those caps
 binding for the project: the first package contains only bootstrap code, the
-Loading scene, `WxBridge`, and the `link.xml` whitelist — every asset larger
-than 1 KB ships in a named subpackage.
+Loading scene, the `Wx` Facade (ADR-0001), and the project `link.xml` —
+every asset larger than 1 KB ships in a named subpackage.
 
 ## Engine Compatibility
 
@@ -72,8 +72,10 @@ Greenfield. No baseline measurement exists.
 
 ### Requirements
 
-- First package contains: WebGL bootstrap, `WxBridge`, Loading scene, IL2CPP managed
-  code (stripped per ADR-0005), `link.xml` whitelist, minimum UI for the Loading screen.
+- First package contains: WebGL bootstrap, the `Wx` Facade (ADR-0001), Loading scene,
+  IL2CPP managed code (stripped per ADR-0005), project `link.xml`, minimum UI for
+  the Loading screen. The Tuanjie SDK assemblies are pulled in by the package
+  manager and stripped to the methods the Facade actually calls.
 - All gameplay scenes ship in subpackages.
 - Every audio/texture/mesh asset > 1 KB ships in a subpackage.
 - Total of all packages (first + subs) ≤ 20 MB.
@@ -84,7 +86,7 @@ Adopt the following budget structure as a binding rule:
 
 | Package | Cap | Contents |
 |---------|-----|----------|
-| First package | 4 MB | bootstrap, `WxBridge`, Loading scene, `link.xml`, stripped IL2CPP code |
+| First package | 4 MB | bootstrap, `Wx` Facade + Tuanjie SDK, Loading scene, project `link.xml`, stripped IL2CPP code |
 | `subpackage_core` | 4 MB | core gameplay scenes + minimum-viable asset set |
 | `subpackage_audio` | 4 MB | BGM + voice (loaded via `wx.createInnerAudioContext` — ADR-0006) |
 | `subpackage_levels_1` | 4 MB | first wave of level content |
@@ -101,12 +103,12 @@ WeChat launch
      ▼
 First package (≤ 4 MB)
   ├── bootstrap
-  ├── WxBridge
+  ├── Wx Facade + Tuanjie SDK (stripped)
   ├── Loading scene
   └── link.xml-preserved IL2CPP code
          │
          ▼
-   Loading.Awake() → WxBridge.LoadSubpackage("subpackage_core")
+   Loading.Awake() → Wx.LoadSubpackage("subpackage_core")
          │
          ▼
    subpackage_core (≤ 4 MB)

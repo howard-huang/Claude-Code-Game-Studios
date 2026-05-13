@@ -21,7 +21,7 @@ Proposed
 ## Summary
 
 All non-bootstrap assets ship in named WeChat subpackages and load via
-`wx.loadSubpackage()` routed through `WxBridge` (ADR-0001). Unity's
+`wx.loadSubpackage()` exposed by the `Wx` Facade (ADR-0001). Unity's
 Addressables system is **forbidden** on this target — it claims ownership of
 asset bundle layout in a way that conflicts with WeChat's subpackage system.
 The legacy `Resources.Load` / `Resources/` folder pattern is **also forbidden**
@@ -42,7 +42,7 @@ because it forces assets into the first package and bypasses the budget gate.
 
 | Field | Value |
 |-------|-------|
-| **Depends On** | ADR-0001 (WxBridge is the entry point for `wx.loadSubpackage`), ADR-0002 (first-package budget defines what goes where) |
+| **Depends On** | ADR-0001 (the `Wx` Facade exposes `LoadSubpackage`), ADR-0002 (first-package budget defines what goes where) |
 | **Enables** | All gameplay-content stories |
 | **Blocks** | Any story that proposes Addressables for asset loading |
 | **Ordering Note** | Accept after ADR-0001 and ADR-0002. |
@@ -89,8 +89,9 @@ Greenfield.
 3. **Adopt WeChat SubPackages** as the only sanctioned asset-loading mechanism.
 4. Assets live in scene-graph references inside their subpackage; loading a
    subpackage = activating its scene/prefab references.
-5. The `WxBridge.LoadSubpackage(name, onSuccess, onError)` method (ADR-0001) is
-   the **only** path from managed code to `wx.loadSubpackage`.
+5. The `Wx.LoadSubpackage(name, onSuccess, onError)` Facade method (ADR-0001)
+   is the **only** path from gameplay code to `wx.loadSubpackage`. Calling
+   `WeChatWASM.WX.LoadSubpackage` directly from gameplay is forbidden.
 
 ### Architecture
 
@@ -101,7 +102,7 @@ Build time:
 
 Runtime:
   Bootstrap → Loading scene (in first package)
-            → WxBridge.LoadSubpackage("subpackage_core", onSuccess, onError)
+            → Wx.LoadSubpackage("subpackage_core", onSuccess, onError)
                  │
                  ▼ (wx.loadSubpackage downloads + caches subpackage_core)
             → SceneManager.LoadSceneAsync("MainMenu")
@@ -110,7 +111,7 @@ Runtime:
             → MainMenu plays.
 
   Later (on demand):
-            → WxBridge.LoadSubpackage("subpackage_levels_2", ...)
+            → Wx.LoadSubpackage("subpackage_levels_2", ...)
             → Level2 scene becomes loadable.
 ```
 
@@ -119,14 +120,14 @@ Runtime:
 ```csharp
 namespace CCGS.Core.Platform
 {
-    public static class WxBridge
+    public static class Wx
     {
         public static void LoadSubpackage(string name, Action onSuccess, Action<string> onError);
     }
 }
 
 // Caller pattern:
-WxBridge.LoadSubpackage(
+Wx.LoadSubpackage(
     "subpackage_core",
     onSuccess: () => SceneManager.LoadSceneAsync("MainMenu"),
     onError: msg => UIErrorPopup.Show(msg)
@@ -138,7 +139,7 @@ WxBridge.LoadSubpackage(
 - Subpackage names are declared in `Unity/Assets/Plugins/WeChat/subpackages.json`.
 - Each subpackage maps to a Unity scene + a prefab manifest.
 - The Loading scene is the only thing in the first package that can call
-  `WxBridge.LoadSubpackage` — gameplay code calls it only after Loading hands off.
+  `Wx.LoadSubpackage` — gameplay code calls it only after Loading hands off.
 - Show progress UI during subpackage download — `wx.loadSubpackage` returns a
   `loadTask` object whose `onProgressUpdate` exposes percent complete.
 - Never duplicate an asset across subpackages; route shared assets into a
@@ -181,9 +182,10 @@ WxBridge.LoadSubpackage(
 
 ### Negative
 
-- Unity Editor playmode cannot use `wx.loadSubpackage` — `WxBridge.Mock` returns
-  immediately, all assets are assumed present. This means Editor playmode does
-  not catch missing-asset errors that the WeChat client would catch.
+- Unity Editor playmode cannot reach a real WeChat client — the Tuanjie SDK's
+  `wx-runtime-editor.dll` Editor mock returns sensibly from `Wx.LoadSubpackage`
+  without actually downloading anything. This means Editor playmode does not
+  catch missing-asset errors that the WeChat client would catch.
 - Devs must learn the subpackage model.
 
 ### Neutral
@@ -197,7 +199,7 @@ WxBridge.LoadSubpackage(
 |------|------------|--------|-----------|
 | Someone adds `com.unity.addressables` to `manifest.json` | MEDIUM | HIGH | Add a CI grep gate that fails the build if the package appears. |
 | Cross-subpackage asset reference breaks at runtime | MEDIUM | HIGH | Run an asset-reference validator in CI that walks subpackage manifests. |
-| Subpackage download fails on flaky network | HIGH | MEDIUM | Mandatory retry-with-backoff in `WxBridge.LoadSubpackage`; show user retry UI. |
+| Subpackage download fails on flaky network | HIGH | MEDIUM | Mandatory retry-with-backoff in the caller (gameplay layer, not Facade); show user retry UI. |
 
 ## Performance Implications
 
@@ -214,7 +216,7 @@ Greenfield. Implementation order:
 
 1. Create `subpackages.json` with one named subpackage: `subpackage_core`.
 2. Move the MainMenu scene into `subpackage_core`.
-3. Implement `WxBridge.LoadSubpackage` (ADR-0001 dependency).
+3. Implement `Wx.LoadSubpackage` Facade method (ADR-0001 dependency).
 4. Loading scene calls `LoadSubpackage("subpackage_core")` then loads MainMenu.
 5. CI grep gate: `manifest.json` must not contain `addressables`; tree must not
    contain a `Resources/` folder.
@@ -227,7 +229,8 @@ Greenfield. Implementation order:
 - [ ] No `Resources/` folder exists under `Unity/Assets/`.
 - [ ] First WebGL build produces multiple `.wxpkg` (or equivalent) files matching
       `subpackages.json`.
-- [ ] PlayMode test confirms `WxBridge.Mock.LoadSubpackage` calls `onSuccess`.
+- [ ] EditMode test confirms `Wx.LoadSubpackage` invokes the SDK Editor mock
+      and calls `onSuccess`.
 - [ ] WebGL build on real WeChat client confirms `LoadSubpackage` downloads and
       activates assets.
 - [ ] CI grep gate fails when Addressables or `Resources/` are reintroduced (negative test).
@@ -243,7 +246,7 @@ Greenfield. Implementation order:
 
 ## Related
 
-- ADR-0001 (WxBridge owns the bridge to `wx.loadSubpackage`)
+- ADR-0001 (the `Wx` Facade exposes `LoadSubpackage`)
 - ADR-0002 (first-package budget that drives the need for subpackages)
 - ADR-0006 (audio strategy uses a dedicated audio subpackage)
 - Forbidden patterns list in `.claude/docs/technical-preferences.md`

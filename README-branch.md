@@ -37,7 +37,7 @@ my-wx-game/
 └── Unity/                   # Unity 2021.3 project root
     ├── Assets/Scripts/{Core,Gameplay,AI,UI,Networking,Data,Tools}/
     ├── Assets/{Art,Audio,Data,Shaders,VFX,Prefabs,Scenes}/
-    ├── Assets/Plugins/WeChat/   (clone Tuanjie SDK here)
+    ├── Assets/Plugins/WeChat/   (mostly empty; SDK installs via UPM)
     ├── Assets/Tests/{EditMode,PlayMode}/  (NUnit asmdefs)
     ├── Packages/manifest.json
     └── ProjectSettings/{ProjectVersion.txt, README.md}
@@ -58,7 +58,7 @@ my-wx-game/
    becomes `Unity/Assets/Scripts/Gameplay/`. The source repo keeps the
    engine-agnostic root paths — only the deployed copies are rewritten.
 8. Prints a "Next Steps" block with the manual Player Settings checklist and
-   the WeChat SDK clone URL.
+   the WeChat SDK UPM install instructions.
 
 **Out of scope:** the installer does NOT initialise git, does NOT install Unity,
 does NOT install the Tuanjie SDK, and does NOT modify any binary
@@ -74,16 +74,20 @@ the template for production work.
 
 | # | Title | Core decision |
 |---|---|---|
-| 0001 | WX-SDK Adapter Layer | All `wx.*` calls funnel through `WxBridge` (`Unity/Assets/Scripts/Core/Platform/WxBridge.cs`); `.jslib` at `Unity/Assets/Plugins/WeChat/`. |
+| 0001 | WX-SDK Facade Layer | All `WeChatWASM.WX.*` calls funnel through the `Wx` Facade (`Unity/Assets/Scripts/Core/Platform/Wx.cs`); SDK ships via UPM (`com.qq.weixin.minigame`). |
 | 0002 | First-package Budget ≤ 4 MB | Main package ≤ 4 MB, each subpackage ≤ 4 MB, total ≤ 20 MB. CI gate enforces. |
-| 0003 | Asset Loading via WeChat SubPackages | Addressables forbidden; `Resources/` forbidden; only `wx.loadSubpackage` via `WxBridge`. |
+| 0003 | Asset Loading via WeChat SubPackages | Addressables forbidden; `Resources/` forbidden; only `wx.loadSubpackage` via `Wx.LoadSubpackage` Facade. |
 | 0004 | Render Pipeline — Built-in default, URP opt-in | Phase 1 Built-in; URP is supported by WeChat (WebGL 2.0) but reserved for Phase 2 via a successor ADR. HDRP forbidden. |
 | 0005 | IL2CPP Strip Level High + `link.xml` | Strip High is the only level that fits the 4 MB budget. Reflection-used types live in `Unity/Assets/link.xml`. |
-| 0006 | Audio Strategy — long via `wx.createInnerAudioContext`, short via Unity AudioSource | > 3 s OR > 100 KB → native WeChat audio (memory cheap); shorter → Unity AudioSource (latency cheap). |
+| 0006 | Audio Strategy — long via `wx.createInnerAudioContext`, short via Unity AudioSource | > 3 s OR > 100 KB → `Wx.PlayInnerAudio` Facade (memory cheap); shorter → Unity AudioSource (latency cheap). |
 
-ADR-0001, 0003, and 0006 collectively require an actual `WxBridge.cs`
-implementation. The ADRs define the API surface; you write the bridge against
-the SDK version you ultimately use.
+ADR-0001, 0003, and 0006 collectively define the `Wx` Facade
+(`Unity/Assets/Scripts/Core/Platform/Wx.cs`) — a thin static wrapper around
+`WeChatWASM.WX.*` that flattens the SDK's callback-option pattern into
+`Action`-based C# idioms and centralizes namespace isolation. The SDK itself
+(`.jslib` files, `wx-runtime-editor.dll` Editor mock, and the SDK's own
+`link.xml`) ships via UPM at `Library/PackageCache/com.qq.weixin.minigame@*/`,
+so the project owns only the Facade methods, not a parallel bridge layer.
 
 ---
 

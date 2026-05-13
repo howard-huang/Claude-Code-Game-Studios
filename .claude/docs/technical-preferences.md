@@ -73,6 +73,8 @@
 - `async/await` on hot paths
 - `Unity.Entities.*` / `Unity.Burst.*` / `Unity.Jobs.*` (DOTS — WebGL incomplete)
 - `Addressables.*` (conflicts with WeChat SubPackages — ADR-0003)
+- `using WeChatWASM;` **outside** `Unity/Assets/Scripts/Core/Platform/` — all
+  gameplay code must call the `Wx` Facade (ADR-0001), never the SDK directly.
 
 **NOT forbidden**: URP (see ADR-0004), `Unity.Mathematics` (works in WebGL).
 
@@ -89,7 +91,7 @@
 
 <!-- Quick reference linking to full ADRs in docs/architecture/ -->
 
-- ADR-0001 — WX-SDK Adapter Layer (Proposed)
+- ADR-0001 — WX-SDK Facade Layer (Proposed)
 - ADR-0002 — First-package Budget ≤ 4 MB (Proposed)
 - ADR-0003 — Asset Loading via WeChat SubPackages, Addressables Forbidden (Proposed)
 - ADR-0004 — Render Pipeline: Built-in default, URP opt-in (Proposed)

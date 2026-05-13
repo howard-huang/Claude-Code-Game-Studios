@@ -21,9 +21,14 @@ Proposed
 
 The Unity Player Settings managed-code stripping level is fixed at **High**.
 Without it, the IL2CPP-compiled managed assemblies blow the 4 MB first-package
-budget (ADR-0002). A project-local `Unity/Assets/link.xml` whitelist preserves
-the types reached via reflection so they are not stripped — including the
-`WxBridge` PInvoke surface (ADR-0001) and any JsonUtility/serialization targets.
+budget (ADR-0002). The Tuanjie SDK ships its own `link.xml` at
+`Library/PackageCache/com.qq.weixin.minigame@*/Runtime/Plugins/link.xml`, so
+the SDK's reflection-used types are already preserved. A project-local
+`Unity/Assets/link.xml` whitelist preserves **project** types reached via
+reflection (JsonUtility/serialization targets, `[CreateAssetMenu]`
+ScriptableObjects loaded by name, attribute-scanned MonoBehaviour subclasses,
+etc.). The `Wx` Facade (ADR-0001) does not need a `link.xml` entry — it is
+called directly by gameplay code and the static analyzer sees the references.
 
 ## Engine Compatibility
 
@@ -112,16 +117,23 @@ WebAssembly (managed contribution to first package: 1–2 MB)
 
 ```xml
 <linker>
-  <!-- WxBridge PInvoke surface (ADR-0001) -->
-  <assembly fullname="Assembly-CSharp">
-    <type fullname="CCGS.Core.Platform.WxBridge" preserve="all"/>
-  </assembly>
+  <!-- The Tuanjie SDK's own link.xml lives at                                -->
+  <!-- Library/PackageCache/com.qq.weixin.minigame@*/Runtime/Plugins/link.xml -->
+  <!-- and is preserved automatically. This file is for PROJECT reflection    -->
+  <!-- targets only.                                                          -->
 
-  <!-- JsonUtility targets — add each serializable class explicitly -->
-  <!-- (example placeholder; add real types as features land)         -->
+  <!-- JsonUtility / save-data targets — add each serializable class explicitly -->
+  <!-- (example placeholder; add real types as features land)                   -->
   <!--
   <assembly fullname="Assembly-CSharp">
     <type fullname="CCGS.Gameplay.SaveData" preserve="all"/>
+  </assembly>
+  -->
+
+  <!-- ScriptableObjects loaded by reflection (e.g., AudioStreamReference per ADR-0006) -->
+  <!--
+  <assembly fullname="Assembly-CSharp">
+    <type fullname="CCGS.Core.Audio.AudioStreamReference" preserve="all"/>
   </assembly>
   -->
 
@@ -161,7 +173,7 @@ WebAssembly (managed contribution to first package: 1–2 MB)
 - **Pros**: Fewer `link.xml` entries than High.
 - **Cons**: Managed contribution typically lands at 2–4 MB. **Possibly** fits, but
   leaves no headroom for other first-package contents (bootstrap, Loading scene,
-  WxBridge). Risky.
+  the `Wx` Facade + stripped Tuanjie SDK assemblies). Risky.
 - **Rejection Reason**: Wrong side of the budget cliff.
 
 ### Alternative 3: Strip High + heavy use of `[Preserve]` instead of `link.xml`
@@ -213,7 +225,10 @@ WebAssembly (managed contribution to first package: 1–2 MB)
 Greenfield. Implementation order:
 
 1. Set Player Settings as listed in Decision.
-2. Create empty `Unity/Assets/link.xml` with the `WxBridge` entry only.
+2. Create empty `Unity/Assets/link.xml` with project reflection entries (start
+   with no entries; add as features land). The Tuanjie SDK's own `link.xml`
+   under `Library/PackageCache/com.qq.weixin.minigame@*/Runtime/Plugins/` covers
+   the SDK side automatically.
 3. First WebGL build verifies managed-code size.
 4. Add reflection-using libraries one at a time; each addition runs a WebGL smoke test.
 
@@ -224,7 +239,9 @@ incident as a Risk for re-baselining ADR-0002.
 ## Validation Criteria
 
 - [ ] Player Settings → Managed Stripping Level = High (confirmed via `ProjectSettings/ProjectSettings.asset` inspection).
-- [ ] `Unity/Assets/link.xml` exists and contains the `WxBridge` entry.
+- [ ] `Unity/Assets/link.xml` exists (may be empty until reflection use cases land).
+- [ ] Tuanjie SDK's bundled `link.xml` is auto-included by Unity (verify via
+      Player log on first WebGL build: search for `Library/PackageCache/com.qq.weixin.minigame@*/Runtime/Plugins/link.xml`).
 - [ ] First WebGL build managed-code contribution ≤ 2 MB.
 - [ ] PlayMode smoke test exercises every reflection-using code path.
 - [ ] WebGL build of the same smoke test passes (catches stripping bugs Editor misses).
@@ -241,5 +258,5 @@ incident as a Risk for re-baselining ADR-0002.
 ## Related
 
 - ADR-0002 (first-package budget that drives the need for High)
-- ADR-0001 (`WxBridge` is the first entry in `link.xml`)
+- ADR-0001 (the `Wx` Facade calls the Tuanjie SDK; SDK ships its own `link.xml`)
 - Forbidden patterns list in `.claude/docs/technical-preferences.md` (JIT, reflection-emit)

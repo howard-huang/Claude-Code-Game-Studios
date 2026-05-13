@@ -378,8 +378,13 @@ Write-Host "       $TargetPath\Unity\ProjectSettings\README.md" -ForegroundColor
 Write-Host "     (Scripting Backend=IL2CPP, Stripping=High, .NET Standard 2.1," -ForegroundColor Gray
 Write-Host "      WebGL Memory=256MB, Color Space=Linear, Brotli, Built-in RP)" -ForegroundColor Gray
 Write-Host ""
-Write-Host "  3. Clone the WeChat Mini Game SDK into Unity\Assets\Plugins\WeChat\:" -ForegroundColor White
+Write-Host "  3. Install the Tuanjie WeChat Mini Game SDK via UPM:" -ForegroundColor White
+Write-Host "       Add `"com.qq.weixin.minigame`": `"<git-url>`" to Unity\Packages\manifest.json" -ForegroundColor Gray
+Write-Host "       per the SDK README:" -ForegroundColor Gray
 Write-Host "       https://github.com/wechat-miniprogram/minigame-tuanjie-transform-sdk" -ForegroundColor Gray
+Write-Host "     The SDK installs into Library\PackageCache\com.qq.weixin.minigame@*\" -ForegroundColor Gray
+Write-Host "     (NOT into Unity\Assets\Plugins\WeChat\ — that directory stays mostly" -ForegroundColor Gray
+Write-Host "      empty under the Facade design; see Plugins\WeChat\README.md)." -ForegroundColor Gray
 Write-Host "     IMPORTANT: Verify Tuanjie SDK <-> Unity 2021.3 compatibility before" -ForegroundColor Yellow
 Write-Host "     your first WebGL build (see ADR-0001). The SDK targets Tuanjie" -ForegroundColor Yellow
 Write-Host "     engine (Unity China fork, Unity 2022 base). If it refuses to load," -ForegroundColor Yellow

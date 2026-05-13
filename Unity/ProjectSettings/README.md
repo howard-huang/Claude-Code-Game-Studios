@@ -40,8 +40,8 @@ and Library/ has been rebuilt, configure these settings manually in
 
 ## Player → Resolution and Presentation
 
-- [ ] **Default Canvas Width** = `1920`
-- [ ] **Default Canvas Height** = `1080`
+- [ ] **Default Canvas Width** = `720`  *(portrait mobile — WeChat default)*
+- [ ] **Default Canvas Height** = `1280`
 - [ ] **Run In Background** = OFF
 
 ## Build Settings
@@ -79,7 +79,7 @@ and Library/ has been rebuilt, configure these settings manually in
 
 ## Related ADRs
 
-- ADR-0001 — WxBridge adapter (`Unity/Assets/Plugins/WeChat/` + Scripts/Core/Platform/)
+- ADR-0001 — `Wx` Facade (`Unity/Assets/Scripts/Core/Platform/Wx.cs`) wraps `WeChatWASM.WX.*`
 - ADR-0002 — 4 MB first-package budget
 - ADR-0003 — SubPackages mandatory; Addressables forbidden
 - ADR-0004 — Built-in RP default; URP Phase 2 opt-in

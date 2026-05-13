@@ -23,7 +23,7 @@ layout and cannot coexist. See
    groups, labels, `Addressables.LoadAssetAsync<T>`, content catalogs, or asset bundles
    managed by the Addressables system.
 2. **Redirect** to ADR-0003: assets ship via WeChat SubPackages, loaded with
-   `wx.loadSubpackage()` through the `WxBridge` adapter (ADR-0001).
+   `wx.loadSubpackage()` through the `Wx` Facade (ADR-0001).
 3. **Suggest the right pattern**: bundle non-essential assets in a SubPackage,
    reference them through scene-embedded prefabs/ScriptableObjects, and call
    `wx.loadSubpackage` before the scene loads.

@@ -21,11 +21,11 @@ Proposed
 ## Summary
 
 Long audio (BGM and voice lines > 3 s **or** > 100 KB compressed) routes through
-`wx.createInnerAudioContext` via `WxBridge` (ADR-0001) — WeChat decodes the
-audio natively and streams it without holding the full PCM in Unity's 256 MB
-memory ceiling. Short SFX (< 3 s and < 100 KB) play via Unity `AudioSource`
-because WebAudio decode for sub-second clips is cheap and the latency of
-`wx.createInnerAudioContext` first-play is too high for snappy SFX.
+`wx.createInnerAudioContext` exposed by the `Wx` Facade (ADR-0001) — WeChat
+decodes the audio natively and streams it without holding the full PCM in
+Unity's 256 MB memory ceiling. Short SFX (< 3 s and < 100 KB) play via Unity
+`AudioSource` because WebAudio decode for sub-second clips is cheap and the
+latency of `wx.createInnerAudioContext` first-play is too high for snappy SFX.
 
 ## Engine Compatibility
 
@@ -42,7 +42,7 @@ because WebAudio decode for sub-second clips is cheap and the latency of
 
 | Field | Value |
 |-------|-------|
-| **Depends On** | ADR-0001 (WxBridge owns `wx.createInnerAudioContext`), ADR-0003 (audio assets live in a subpackage) |
+| **Depends On** | ADR-0001 (the `Wx` Facade exposes `PlayBgm` / `PlayInnerAudio`), ADR-0003 (audio assets live in a subpackage) |
 | **Enables** | Any audio-bearing feature |
 | **Blocks** | Long voice / BGM stories that try to load the audio via `AudioSource.clip` (would blow memory) |
 | **Ordering Note** | Accept after ADR-0001 and ADR-0003. |
@@ -85,8 +85,9 @@ Greenfield. No audio routing decision yet.
 - BGM and long voice lines do not consume Unity heap for their PCM.
 - SFX play with < 1-frame latency from trigger.
 - Audio assets respect the first-package budget (ship in `subpackage_audio`).
-- Editor playmode plays all audio for iteration speed — `WxBridge.Mock`
-  fallback for `wx.createInnerAudioContext` routes to Unity AudioSource.
+- Editor playmode plays all audio for iteration speed — the Tuanjie SDK's
+  `wx-runtime-editor.dll` mock handles `wx.createInnerAudioContext` calls in
+  Editor automatically, so `Wx.PlayBgm` works without a project-side mock.
 
 ## Decision
 
@@ -94,16 +95,16 @@ Route audio by length / size threshold:
 
 | Audio category | Threshold | Path |
 |---------------|-----------|------|
-| BGM | always | `wx.createInnerAudioContext` (loop=true) via `WxBridge` |
-| Voice line | > 3 s OR > 100 KB compressed | `wx.createInnerAudioContext` |
+| BGM | always | `Wx.PlayBgm(url)` Facade → `wx.createInnerAudioContext` |
+| Voice line | > 3 s OR > 100 KB compressed | `Wx.PlayInnerAudio(url)` Facade |
 | Voice line | ≤ 3 s AND ≤ 100 KB | Unity `AudioSource` |
 | SFX (hit, UI tick, footstep) | always | Unity `AudioSource` |
-| Ambient loop | > 3 s OR > 100 KB | `wx.createInnerAudioContext` (loop=true) |
+| Ambient loop | > 3 s OR > 100 KB | `Wx.PlayInnerAudio(url, loop=true)` Facade |
 
 The threshold is enforced at asset-import time: an `AudioImportRule` in
 `Unity/Assets/Scripts/Tools/AudioImportRule.cs` classifies each AudioClip and
 either marks it for AudioSource use (loaded into PCM) or routes it via an
-`AudioStreamReference` ScriptableObject for `WxBridge` playback.
+`AudioStreamReference` ScriptableObject for `Wx` Facade playback.
 
 ### Architecture
 
@@ -118,7 +119,7 @@ Audio asset ───►│  AudioImportRule           │
    ≤ 3 s AND ≤ 100 KB              > 3 s OR > 100 KB
         │                                    │
         ▼                                    ▼
-   AudioSource.PlayOneShot          WxBridge.PlayInnerAudio(url, loop)
+   AudioSource.PlayOneShot          Wx.PlayInnerAudio(url, loop)
    (PCM in Unity heap)              (decoded by WeChat, streamed)
 ```
 
@@ -127,11 +128,14 @@ Audio asset ───►│  AudioImportRule           │
 ```csharp
 namespace CCGS.Core.Platform
 {
-    public static class WxBridge
+    public static partial class Wx
     {
-        public static AudioHandle PlayInnerAudio(string url, bool loop);
+        public static AudioHandle PlayInnerAudio(string url, bool loop = false);
         public static void StopInnerAudio(AudioHandle handle);
         public static void SetInnerAudioVolume(AudioHandle handle, float volume);
+
+        // Convenience: BGM is the long-loop case of PlayInnerAudio.
+        public static AudioHandle PlayBgm(string url) => PlayInnerAudio(url, loop: true);
     }
 
     public struct AudioHandle { internal int id; }
@@ -151,9 +155,12 @@ public class AudioStreamReference : ScriptableObject
   `AudioStreamReference`, never via `AudioClip`.
 - SFX assets ship in their owning subpackage (e.g., combat SFX in
   `subpackage_core`), use `AudioClip` references, play through `AudioSource`.
-- `WxBridge.PlayInnerAudio` returns an `AudioHandle` — store it to stop/volume.
-- `WxBridge.Mock` (Editor) routes `PlayInnerAudio` through a regular AudioSource
-  so iteration works in Editor.
+- `Wx.PlayInnerAudio` returns an `AudioHandle` — store it to stop/volume.
+- The Tuanjie SDK's `wx-runtime-editor.dll` handles `wx.createInnerAudioContext`
+  in Editor — `Wx.PlayInnerAudio` works in Editor without a project-side mock.
+  If a particular call returns a stub that breaks iteration (e.g., the mock
+  returns immediately without firing `onEnded`), add a thin Editor-only branch
+  inside the Facade method that calls Unity `AudioSource` instead.
 - AudioImportRule runs on asset import; flag assets that don't match either
   category (e.g., 2.9 s / 105 KB borderline cases) and ask the audio-director
   to classify.
@@ -213,7 +220,7 @@ public class AudioStreamReference : ScriptableObject
 |------|------------|--------|-----------|
 | `wx.createInnerAudioContext` instance leak (handles not freed) | MEDIUM | HIGH | `AudioHandle` is `IDisposable`; static analyzer in CI flags unfreed handles. |
 | Subtitle drift from BGM clock | MEDIUM | MEDIUM | Subtitles hook the `onTimeUpdate` callback from `wx.createInnerAudioContext`, not Unity's `Time.time`. |
-| SFX accidentally routed via `WxBridge` (wrong import classification) | MEDIUM | MEDIUM | AudioImportRule emits a warning for borderline cases; audio-director reviews. |
+| SFX accidentally routed via the `Wx` Facade (wrong import classification) | MEDIUM | MEDIUM | AudioImportRule emits a warning for borderline cases; audio-director reviews. |
 | Editor / WebGL behavior diverges enough to mask a real bug | LOW | HIGH | Mandatory WebGL smoke test of every audio-bearing feature before release. |
 
 ## Performance Implications
@@ -230,9 +237,11 @@ public class AudioStreamReference : ScriptableObject
 Greenfield. Implementation order:
 
 1. Define `AudioStreamReference` ScriptableObject.
-2. Implement `WxBridge.PlayInnerAudio` / `StopInnerAudio` / `SetInnerAudioVolume`
-   (depends on ADR-0001).
-3. Implement Editor mock that routes to AudioSource for iteration.
+2. Implement `Wx.PlayInnerAudio` / `StopInnerAudio` / `SetInnerAudioVolume`
+   Facade methods (depends on ADR-0001).
+3. Verify the Tuanjie SDK's `wx-runtime-editor.dll` returns sensibly from
+   `wx.createInnerAudioContext` in Editor; if not, add an Editor-only fallback
+   inside the Facade that routes to Unity AudioSource for iteration.
 4. Implement `AudioImportRule` (asset post-processor) that classifies clips.
 5. Audio-director places first BGM and one long voice line in
    `subpackage_audio`, classifies all SFX as AudioSource.
@@ -245,7 +254,8 @@ accept the memory cost. Document as Risk for ADR-0002 re-baseline.
 ## Validation Criteria
 
 - [ ] `AudioStreamReference` ScriptableObject exists.
-- [ ] `WxBridge.PlayInnerAudio`/`StopInnerAudio`/`SetInnerAudioVolume` exist and have Editor mocks.
+- [ ] `Wx.PlayInnerAudio`/`StopInnerAudio`/`SetInnerAudioVolume` Facade methods exist;
+      Editor playmode confirms they do not crash and the SDK Editor mock returns sensibly.
 - [ ] `AudioImportRule` runs on import and emits classification log.
 - [ ] First BGM in `subpackage_audio` plays via `wx.createInnerAudioContext` on real WeChat client.
 - [ ] First SFX plays via AudioSource with < 1-frame latency on target device.
@@ -264,6 +274,6 @@ accept the memory cost. Document as Risk for ADR-0002 re-baseline.
 
 ## Related
 
-- ADR-0001 (WxBridge is the only path to `wx.createInnerAudioContext`)
+- ADR-0001 (the `Wx` Facade is the only path to `wx.createInnerAudioContext`)
 - ADR-0003 (`subpackage_audio` is where long audio assets live)
 - ADR-0002 (memory budget that drives the routing)
