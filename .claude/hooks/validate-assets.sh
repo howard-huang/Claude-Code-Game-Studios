@@ -27,20 +27,18 @@ if ! echo "$FILE_PATH" | grep -qE '(^|/)assets/'; then
 fi
 
 FILENAME=$(basename "$FILE_PATH")
+
+# PascalCase Unity file types skip all further checks
+case "$FILENAME" in
+    *.cs|*.unity|*.prefab|*.asmdef) exit 0 ;;
+esac
+
 WARNINGS=""   # Style/convention issues -- exit 0 with advisory message
 ERRORS=""     # Build-breaking issues -- exit 1 to block the operation
 
 # ADVISORY: Check naming convention (lowercase with underscores only)
-# Exempt Unity PascalCase file types (.cs, .unity, .prefab, .asmdef)
-# Naming issues are style violations -- warn but do not block
-# Uses grep -E (POSIX) not grep -P (Perl) for Windows Git Bash compatibility
-if echo "$FILE_PATH" | grep -qE '\.(cs|unity|prefab|asmdef)$'; then
-    # PascalCase file types follow Unity conventions -- skip lowercase check
-    :
-else
-    if echo "$FILENAME" | grep -qE '[A-Z[:space:]-]'; then
-        WARNINGS="$WARNINGS\n  NAMING: $FILE_PATH must be lowercase with underscores (got: $FILENAME)"
-    fi
+if echo "$FILENAME" | grep -qE '[A-Z[:space:]-]'; then
+    WARNINGS="$WARNINGS\n  NAMING: $FILE_PATH must be lowercase with underscores (got: $FILENAME)"
 fi
 
 # BLOCKING: Check JSON validity for data files

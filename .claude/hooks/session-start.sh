@@ -34,7 +34,7 @@ fi
 
 # Open bug count
 BUG_COUNT=0
-for dir in tests/playtest production; do
+for dir in tests/playtest production/; do
     if [ -d "$dir" ]; then
         count=$(find "$dir" -name "BUG-*.md" 2>/dev/null | wc -l)
         BUG_COUNT=$((BUG_COUNT + count))
@@ -45,7 +45,7 @@ if [ "$BUG_COUNT" -gt 0 ]; then
 fi
 
 # Code health quick check
-if [ -d "src" ]; then
+if [ -d "src/" ]; then
     TODO_COUNT=$(grep -r "TODO" src/ 2>/dev/null | wc -l)
     FIXME_COUNT=$(grep -r "FIXME" src/ 2>/dev/null | wc -l)
     if [ "$TODO_COUNT" -gt 0 ] || [ "$FIXME_COUNT" -gt 0 ]; then
