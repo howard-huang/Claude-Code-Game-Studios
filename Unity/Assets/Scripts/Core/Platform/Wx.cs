@@ -1,4 +1,5 @@
 using System;
+using UnityEngine;
 using WeChatWASM;
 
 namespace CCGS.Core.Platform
@@ -17,11 +18,26 @@ namespace CCGS.Core.Platform
         /// the SDK error message on failure.
         /// </summary>
         public static void Login(Action<string> onCode, Action<string> onError)
-            => WX.Login(new LoginOption
+        {
+#if UNITY_EDITOR
+            if (!Application.isPlaying)
+                return; // EditMode: SDK unavailable
+#endif
+#if UNITY_WX
+            WX.Login(new LoginOption
             {
                 success = res => onCode?.Invoke(res.code),
                 fail = res => onError?.Invoke(res.errMsg),
             });
+#elif UNITY_DY
+            // TODO: DY.Login() when Douyin SDK integrated
+            return;
+#elif UNITY_BROWSER
+            // Browser WebGL: no mini-game runtime
+            return;
+#else
+            return;
+#endif
+        }
     }
 }
-
