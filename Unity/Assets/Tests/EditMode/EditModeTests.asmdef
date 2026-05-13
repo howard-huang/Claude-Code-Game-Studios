@@ -1,5 +1,6 @@
 {
     "name": "EditModeTests",
+    "references": ["CCGS.Runtime"],
     "includePlatforms": ["Editor"],
     "precompiledReferences": ["nunit.framework.dll"],
     "defineConstraints": ["UNITY_INCLUDE_TESTS"],

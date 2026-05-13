@@ -1,0 +1,23 @@
+<linker>
+  <!-- The Tuanjie SDK's own link.xml lives at                                -->
+  <!-- Library/PackageCache/com.qq.weixin.minigame@*/Runtime/Plugins/link.xml -->
+  <!-- and is preserved automatically. This file is for PROJECT reflection    -->
+  <!-- targets only.                                                          -->
+
+  <!-- JsonUtility / save-data targets — add each serializable class explicitly -->
+  <!--
+  <assembly fullname="Assembly-CSharp">
+    <type fullname="CCGS.Gameplay.SaveData" preserve="all"/>
+  </assembly>
+  -->
+
+  <!-- ScriptableObjects loaded by reflection (e.g., AudioStreamReference per ADR-0006) -->
+  <!--
+  <assembly fullname="Assembly-CSharp">
+    <type fullname="CCGS.Core.Audio.AudioStreamReference" preserve="all"/>
+  </assembly>
+  -->
+
+  <!-- Unity modules that get over-stripped on WebGL — add only if a -->
+  <!-- runtime exception proves the need.                            -->
+</linker>
