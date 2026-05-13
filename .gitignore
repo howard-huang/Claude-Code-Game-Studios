@@ -9,6 +9,9 @@
 Thumbs.db
 Desktop.ini
 
+# === Bash / Shell artifacts ===
+bash.exe.stackdump
+
 # === Claude Code Local ===
 .claude/settings.local.json
 CLAUDE.local.md
