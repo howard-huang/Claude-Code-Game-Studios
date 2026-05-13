@@ -1,4 +1,4 @@
-# ADR-0003: Asset Loading via WeChat SubPackages (Addressables Allowed, Resources Forbidden)
+# ADR-0003: Asset Loading — Addressables or AssetBundle (Resources Forbidden)
 
 ## Status
 
@@ -10,7 +10,7 @@ Accepted
 
 ## Last Verified
 
-2026-05-13
+2026-05-14
 
 ## Decision Makers
 
@@ -21,13 +21,28 @@ Accepted
 ## Summary
 
 All non-bootstrap assets ship outside the first package. The WeChat Mini Game
-SDK supports **three sanctioned loading mechanisms**: SubPackage, CDN, and
-AssetBundle/Addressables. Unity's `Resources/` folder pattern remains forbidden
-(it forces assets into the first package). **Addressables is officially
-supported** by the WX SDK, but carries a catalog-size caveat: for large games
-the `catalog.json` can exceed 10 MB and slow startup. This ADR allows
-Addressables for small-to-medium projects and recommends AssetBundle for
-projects whose Addressables catalog would exceed ~5 MB.
+SDK supports **three sanctioned loading mechanisms**: Addressables (AA),
+AssetBundle (AB), and Instant Game. Unity's `Resources/` folder pattern remains
+forbidden (it forces assets into the first package).
+
+**Addressables is officially supported** by the WX SDK — the official WeChat
+documentation has a dedicated `UsingAddressable.html` guide page, and the SDK's
+file-cache system (ADR-0005 covers cache) explicitly handles Addressables bundle
+requests. The official docs recommend Addressables for **light-to-medium**
+projects but advise **against** Addressables for large projects where the key
+count reaches thousands, at which point the uncompressed `catalog.json` becomes
+a bottleneck. For those projects, AssetBundle is the recommended alternative.
+
+**Project-scale guidance (from official WeChat docs, ResourcesLoading.html):**
+
+| Project Scale | Recommendation | Rationale |
+|--------------|---------------|-----------|
+| Light / medium | **Addressables** | Easier workflow, well-documented, WX SDK auto-caches |
+| Heavy / many assets | **AssetBundle** | Catalog stays lean; better loading performance at scale |
+| Thousands of Addressable keys | **Do NOT use Addressables** | Catalog becomes too large — switch to AssetBundle |
+
+The hard catalog-size gate remains at ~5 MB: measure on the first WebGL build
+and decide before the project's asset count commits the team to one path.
 
 ## Engine Compatibility
 
@@ -36,7 +51,7 @@ projects whose Addressables catalog would exceed ~5 MB.
 | **Engine** | Unity 2021.3 LTS |
 | **Domain** | Asset Pipeline / Content Delivery |
 | **Knowledge Risk** | LOW — WX SDK asset-loading behavior is well-documented in the official WeChat docs |
-| **References Consulted** | `docs/engine-reference/unity/VERSION.md`, WeChat Mini Game Unity docs (`AssetDescription.html`, `StartupOptimization.html`, `DataCDN.html`, `FileCache.html`, `PerfOptimization.html`) |
+| **References Consulted** | `docs/engine-reference/unity/VERSION.md`, WeChat Mini Game Unity docs: `Guide.html` (quick-start), `ResourcesLoading.html` (方案选择), `UsingAddressable.html` (AA 指南), `UsingAssetBundle.html` (AB 指南), `FileCache.html` (缓存), `StartupOptimization.html` (启动优化), `DataCDN.html` (CDN 部署) |
 | **Post-Cutoff APIs Used** | `wx.loadSubpackage` semantics under Tuanjie SDK |
 | **Verification Required** | Measure Addressables catalog size on first WebGL build; if > 5 MB, switch to AssetBundle. |
 
@@ -89,19 +104,35 @@ Greenfield.
 1. **Forbid `Resources/` folder pattern**: no folder named `Resources` is
    permitted under `Unity/Assets/`. This is a hard rule — platform-incompatible
    with the 4 MB budget.
-2. **Allow Addressables**: `com.unity.addressables` is permitted. The WX SDK's
-   file-cache system explicitly handles Addressables bundles (detects
-   `StreamingAssets/aa/WebGL/` paths, triggers auto-cache). Addressables is the
-   recommended choice for small-to-medium projects where the catalog stays under
-   ~5 MB.
-3. **Fall back to AssetBundle when needed**: if the Addressables catalog exceeds
-   ~5 MB (or the total `StreamingAssets/aa/` footprint approaches the 4 MB
-   first-package limit), switch to direct AssetBundle loading. The WX SDK
-   supports `UnityWebRequestAssetBundle` and auto-caches downloaded bundles.
-4. **SubPackage / CDN for first resource package**: configured via
-   `MiniGameConfig.asset` (`assetLoadType`: 0=CDN, 1=小游戏包内). CDN mode is
-   default — no 20 MB ceiling on the first resource package, but affects startup
-   time.
+
+2. **Allow Addressables for light-to-medium projects**: `com.unity.addressables`
+   is permitted. The WX SDK officially supports Addressables (dedicated guide
+   page: `UsingAddressable.html`). The SDK's file-cache system automatically
+   handles Addressables bundles (detects `StreamingAssets/aa/WebGL/` paths,
+   triggers auto-cache). This is the recommended path for projects that won't
+   generate thousands of Addressable keys.
+
+3. **Prefer AssetBundle for heavy/large projects**: the official docs
+   (`ResourcesLoading.html`) warn that the Addressables catalog becomes a
+   bottleneck when the key count reaches thousands — "未压缩的 catalog 较大，
+   加载效率低，改用 AB 包后效果提升明显." For these projects, use
+   `UnityWebRequestAssetBundle` directly. The WX SDK auto-caches downloaded
+   bundles via `bundlePathIdentifier` (default `StreamingAssets`).
+
+4. **Hard catalog-size gate at 5 MB**: on every CI WebGL build, measure
+   `catalog.json` uncompressed size. If > 5 MB, the Addressables path must be
+   re-evaluated against direct AssetBundle loading. This gate catches the
+   issue before the key count grows further.
+
+5. **Instant Game is a known alternative**: the official docs list Unity's
+   Instant Game as a third option (requires Unity 2021.2.5+, uses Tencent
+   Cloud CDN). Not selected as the default because it locks the CDN choice
+   and the engine version. Teams may opt into it as a faster conversion path
+   for simple projects.
+
+6. **First resource package deployment**: configured via `MiniGameConfig.asset`
+   (`assetLoadType`: 0=CDN, 1=小游戏包内). CDN mode is default — no 20 MB
+   ceiling on the first resource package, but affects startup time.
 
 ### Architecture
 
@@ -145,11 +176,16 @@ var bundle = DownloadHandlerAssetBundle.GetContent(request);
 
 ### Implementation Guidelines
 
-- **Small-to-medium project**: start with Addressables (best Editor workflow,
-  well-documented, supported by WX SDK). If catalog grows past 5 MB, reassess.
-- **Large project**: prefer AssetBundle loading directly. The WX SDK's
-  `bundlePathIdentifier` (default `StreamingAssets`) auto-triggers caching for
-  any URL containing that path segment.
+- **Light-to-medium project**: start with Addressables. Best Editor workflow,
+  well-documented, officially supported by WX SDK. Measure catalog size on first
+  CI WebGL build. If catalog > 5 MB, reassess.
+- **Heavy project / thousands of keys**: prefer AssetBundle. The official
+  WeChat docs explicitly recommend AB over AA at this scale. Direct
+  `UnityWebRequestAssetBundle` with `bundlePathIdentifier` (default
+  `StreamingAssets`) triggers WX SDK auto-caching.
+- **Unsure of scale**: start with Addressables (easier to migrate to AB
+  later than to start with AB and regret it). CI gate catches the catalog
+  before it becomes a problem.
 - Do NOT cache `.json` catalog/config files — the `bundleExcludeExtensions`
   defaults to `.json` for this reason. On each new version, either change the
   CDN path or set `no-cache` HTTP headers.
@@ -267,4 +303,4 @@ groups map roughly to AssetBundle names. Documented as a known migration path.
 - ADR-0002 (first-package budget)
 - ADR-0006 (audio assets live in a subpackage)
 - Forbidden patterns list in `.claude/docs/technical-preferences.md`
-- WeChat official docs: AssetDescription, FileCache, DataCDN, PerfOptimization
+- WeChat official docs: `ResourcesLoading.html` (方案选择), `UsingAddressable.html` (AA 指南), `UsingAssetBundle.html` (AB 指南), `FileCache.html` (缓存), `DataCDN.html` (CDN 部署), `InstantGameGuide.html` (Instant Game)
