@@ -72,7 +72,7 @@
 - `AssetBundle.LoadFromMemory`
 - `async/await` on hot paths
 - `Unity.Entities.*` / `Unity.Burst.*` / `Unity.Jobs.*` (DOTS — WebGL incomplete)
-- `Addressables.*` (conflicts with WeChat SubPackages — ADR-0003)
+- `Addressables.*` catalog size must be monitored — if > 5 MB, switch to AssetBundle (ADR-0003)
 - `using WeChatWASM;` **outside** `Unity/Assets/Scripts/Core/Platform/` — all
   gameplay code must call the `Wx` Facade (ADR-0001), never the SDK directly.
 
@@ -91,12 +91,12 @@
 
 <!-- Quick reference linking to full ADRs in docs/architecture/ -->
 
-- ADR-0001 — WX-SDK Facade Layer (Proposed)
-- ADR-0002 — First-package Budget ≤ 4 MB (Proposed)
-- ADR-0003 — Asset Loading via WeChat SubPackages, Addressables Forbidden (Proposed)
-- ADR-0004 — Render Pipeline: Built-in default, URP opt-in (Proposed)
-- ADR-0005 — IL2CPP Strip High + `link.xml` (Proposed)
-- ADR-0006 — Audio Strategy: long via `wx.createInnerAudioContext`, short via Unity AudioSource (Proposed)
+- ADR-0001 — WX-SDK Facade Layer (Accepted)
+- ADR-0002 — First-package Budget ≤ 4 MB (Accepted)
+- ADR-0003 — Asset Loading via WeChat SubPackages (Addressables Allowed, Resources Forbidden) (Accepted)
+- ADR-0004 — Render Pipeline: Built-in default, URP opt-in (Accepted)
+- ADR-0005 — IL2CPP Strip High + `link.xml` (Accepted)
+- ADR-0006 — Audio Strategy: Unity AudioSource primary, SDK auto-adapts (Accepted)
 
 ## Engine Specialists
 
@@ -111,8 +111,8 @@
 - **Additional Specialists**: (none — see Routing Notes for forbidden ones)
 - **Routing Notes**:
   - REFUSE to spawn `unity-dots-specialist` — DOTS/Burst on WebGL is incomplete.
-  - REFUSE to use `unity-addressables-specialist` for asset-loading decisions —
-    conflicts with WeChat SubPackages (see ADR-0003).
+  - `unity-addressables-specialist` may be consulted for Addressables-specific
+    decisions, with the catalog-size caveat (see ADR-0003).
 
 ### File Extension Routing
 

@@ -1,8 +1,8 @@
-# ADR-0003: Asset Loading via WeChat SubPackages (Addressables Forbidden)
+# ADR-0003: Asset Loading via WeChat SubPackages (Addressables Allowed, Resources Forbidden)
 
 ## Status
 
-Proposed
+Accepted
 
 ## Date
 
@@ -10,22 +10,24 @@ Proposed
 
 ## Last Verified
 
-2026-05-12
+2026-05-13
 
 ## Decision Makers
 
 - `technical-director` (architecture authority)
 - `unity-specialist` (Unity build pipeline)
-- `unity-addressables-specialist` (consulted as negative specialist; recommendations rejected per platform)
+- `unity-addressables-specialist` (consulted on catalog-size constraints)
 
 ## Summary
 
-All non-bootstrap assets ship in named WeChat subpackages and load via
-`wx.loadSubpackage()` exposed by the `Wx` Facade (ADR-0001). Unity's
-Addressables system is **forbidden** on this target — it claims ownership of
-asset bundle layout in a way that conflicts with WeChat's subpackage system.
-The legacy `Resources.Load` / `Resources/` folder pattern is **also forbidden**
-because it forces assets into the first package and bypasses the budget gate.
+All non-bootstrap assets ship outside the first package. The WeChat Mini Game
+SDK supports **three sanctioned loading mechanisms**: SubPackage, CDN, and
+AssetBundle/Addressables. Unity's `Resources/` folder pattern remains forbidden
+(it forces assets into the first package). **Addressables is officially
+supported** by the WX SDK, but carries a catalog-size caveat: for large games
+the `catalog.json` can exceed 10 MB and slow startup. This ADR allows
+Addressables for small-to-medium projects and recommends AssetBundle for
+projects whose Addressables catalog would exceed ~5 MB.
 
 ## Engine Compatibility
 
@@ -33,32 +35,33 @@ because it forces assets into the first package and bypasses the budget gate.
 |-------|-------|
 | **Engine** | Unity 2021.3 LTS |
 | **Domain** | Asset Pipeline / Content Delivery |
-| **Knowledge Risk** | MEDIUM — `wx.loadSubpackage` is platform-level (post-cutoff for some semantics); Unity Addressables behavior is in training data |
-| **References Consulted** | `docs/engine-reference/unity/VERSION.md`, WeChat Mini Game docs |
+| **Knowledge Risk** | LOW — WX SDK asset-loading behavior is well-documented in the official WeChat docs |
+| **References Consulted** | `docs/engine-reference/unity/VERSION.md`, WeChat Mini Game Unity docs (`AssetDescription.html`, `StartupOptimization.html`, `DataCDN.html`, `FileCache.html`, `PerfOptimization.html`) |
 | **Post-Cutoff APIs Used** | `wx.loadSubpackage` semantics under Tuanjie SDK |
-| **Verification Required** | Confirm Tuanjie SDK exposes `wx.loadSubpackage` and that asset references inside a subpackage resolve correctly when loaded. |
+| **Verification Required** | Measure Addressables catalog size on first WebGL build; if > 5 MB, switch to AssetBundle. |
 
 ## ADR Dependencies
 
 | Field | Value |
 |-------|-------|
-| **Depends On** | ADR-0001 (the `Wx` Facade exposes `LoadSubpackage`), ADR-0002 (first-package budget defines what goes where) |
+| **Depends On** | ADR-0001 (the `Wx` Facade exposes `LoadSubpackage`), ADR-0002 (first-package budget) |
 | **Enables** | All gameplay-content stories |
-| **Blocks** | Any story that proposes Addressables for asset loading |
+| **Blocks** | Nothing (Addressables is allowed; Resources is forbidden) |
 | **Ordering Note** | Accept after ADR-0001 and ADR-0002. |
 
 ## Context
 
 ### Problem Statement
 
-Unity's default workflow uses either `Resources.Load` (deprecated for new projects)
-or Addressables (the modern, recommended path). Both are incompatible with the
-WeChat Mini Game first-package budget:
+Unity's default workflow uses either `Resources.Load`, AssetBundles, or
+Addressables. The WeChat Mini Game platform adds SubPackage and CDN as
+platform-specific options. Without clear guidance, a team might:
 
-- `Resources/` folder contents are baked into the first package — ignoring ADR-0002.
-- Addressables generates its own bundle layout with its own dependency catalog,
-  duplicating the work that `wx.loadSubpackage` does — and the two systems do not
-  coordinate. Running both produces duplicated assets, broken references, or both.
+- Use `Resources/` and blow the 4 MB first-package cap (ADR-0002).
+- Choose Addressables for a large game and hit the catalog.json > 10 MB
+  bottleneck documented in the WeChat performance optimization guide.
+- Duplicate work across the platform's built-in caching system and a
+  custom asset-loading layer.
 
 ### Current State
 
@@ -66,187 +69,202 @@ Greenfield.
 
 ### Constraints
 
-- First package ≤ 4 MB (ADR-0002).
-- Subpackage downloads happen at runtime via `wx.loadSubpackage("subpackage_name", callbacks)`.
-- After `wx.loadSubpackage` succeeds, the assets in that subpackage are addressable
-  via normal Unity APIs (`Resources.Load` would work but is forbidden per first-package
-  rule; scene-embedded references work).
-- IL2CPP Strip High removes unused code paths — anything loaded via reflection must
-  be declared in `link.xml` (ADR-0005).
+- First package ≤ 4 MB (ADR-0002), total ≤ 20 MB.
+- WeChat client caches downloaded assets automatically (LRU, 200 MB default,
+  upgradeable to 1 GB).
+- Cache is triggered for `UnityWebRequest`, `WWW`,
+  `UnityWebRequestAssetBundle`, and Addressables.
+- `Resources/` folder contents are baked into the first package.
+- IL2CPP Strip High (ADR-0005) removes unused code paths.
+- Single AssetBundle < 2 MB recommended; download concurrency ≤ 20.
 
 ### Requirements
 
-- Every non-bootstrap asset belongs to exactly one subpackage.
-- Subpackage names are stable identifiers known at build time.
-- Loading a subpackage is an asynchronous operation with success/error callbacks.
-- Scene references inside a subpackage resolve cleanly after the subpackage loads.
+- Every non-bootstrap asset ships outside the first package.
+- Loading is asynchronous with success/error callbacks.
+- Scene references resolve correctly after the asset package loads.
 
 ## Decision
 
-1. **Forbid Addressables**: `com.unity.addressables` is **not** in `Packages/manifest.json`.
-2. **Forbid `Resources/` folder pattern**: no folder named `Resources` is permitted
-   under `Unity/Assets/`.
-3. **Adopt WeChat SubPackages** as the only sanctioned asset-loading mechanism.
-4. Assets live in scene-graph references inside their subpackage; loading a
-   subpackage = activating its scene/prefab references.
-5. The `Wx.LoadSubpackage(name, onSuccess, onError)` Facade method (ADR-0001)
-   is the **only** path from gameplay code to `wx.loadSubpackage`. Calling
-   `WeChatWASM.WX.LoadSubpackage` directly from gameplay is forbidden.
+1. **Forbid `Resources/` folder pattern**: no folder named `Resources` is
+   permitted under `Unity/Assets/`. This is a hard rule — platform-incompatible
+   with the 4 MB budget.
+2. **Allow Addressables**: `com.unity.addressables` is permitted. The WX SDK's
+   file-cache system explicitly handles Addressables bundles (detects
+   `StreamingAssets/aa/WebGL/` paths, triggers auto-cache). Addressables is the
+   recommended choice for small-to-medium projects where the catalog stays under
+   ~5 MB.
+3. **Fall back to AssetBundle when needed**: if the Addressables catalog exceeds
+   ~5 MB (or the total `StreamingAssets/aa/` footprint approaches the 4 MB
+   first-package limit), switch to direct AssetBundle loading. The WX SDK
+   supports `UnityWebRequestAssetBundle` and auto-caches downloaded bundles.
+4. **SubPackage / CDN for first resource package**: configured via
+   `MiniGameConfig.asset` (`assetLoadType`: 0=CDN, 1=小游戏包内). CDN mode is
+   default — no 20 MB ceiling on the first resource package, but affects startup
+   time.
 
 ### Architecture
 
 ```
 Build time:
-  Unity build pipeline → multiple AssetBundles, one per declared subpackage
-                       → packaged into WeChat subpackage manifest
+  Option A (Addressables):
+    Unity Addressables build → StreamingAssets/aa/WebGL/
+                             → WX SDK auto-caches downloaded bundles
+  Option B (AssetBundle):
+    Unity AssetBundle build   → bundles with hash in filename
+                             → WX SDK auto-caches via bundlePathIdentifier
 
 Runtime:
   Bootstrap → Loading scene (in first package)
-            → Wx.LoadSubpackage("subpackage_core", onSuccess, onError)
+            → Wx.LoadSubpackage("subpackage_core", ...)  OR
+            → Addressables.LoadAssetAsync<T>(key)         OR
+            → UnityWebRequestAssetBundle.GetAssetBundle(url)
                  │
-                 ▼ (wx.loadSubpackage downloads + caches subpackage_core)
-            → SceneManager.LoadSceneAsync("MainMenu")
-                 │
-                 ▼ (assets in subpackage_core are now resolvable)
-            → MainMenu plays.
-
-  Later (on demand):
-            → Wx.LoadSubpackage("subpackage_levels_2", ...)
-            → Level2 scene becomes loadable.
+                 ▼
+            → Asset is available; scene loads.
 ```
 
 ### Key Interfaces
 
 ```csharp
-namespace CCGS.Core.Platform
-{
-    public static class Wx
-    {
-        public static void LoadSubpackage(string name, Action onSuccess, Action<string> onError);
-    }
-}
-
-// Caller pattern:
-Wx.LoadSubpackage(
-    "subpackage_core",
+// Option 1: SubPackage (via Wx Facade)
+Wx.LoadSubpackage("subpackage_core",
     onSuccess: () => SceneManager.LoadSceneAsync("MainMenu"),
-    onError: msg => UIErrorPopup.Show(msg)
+    onError: msg => HandleError(msg)
 );
+
+// Option 2: Addressables (standard Unity API)
+var handle = Addressables.LoadAssetAsync<GameObject>("MainMenu");
+await handle.Task;
+
+// Option 3: AssetBundle (standard Unity API)
+var request = UnityWebRequestAssetBundle.GetAssetBundle(url);
+await request.SendWebRequest();
+var bundle = DownloadHandlerAssetBundle.GetContent(request);
 ```
 
 ### Implementation Guidelines
 
-- Subpackage names are declared in `Unity/Assets/Plugins/WeChat/subpackages.json`.
-- Each subpackage maps to a Unity scene + a prefab manifest.
-- The Loading scene is the only thing in the first package that can call
-  `Wx.LoadSubpackage` — gameplay code calls it only after Loading hands off.
-- Show progress UI during subpackage download — `wx.loadSubpackage` returns a
-  `loadTask` object whose `onProgressUpdate` exposes percent complete.
-- Never duplicate an asset across subpackages; route shared assets into a
-  `subpackage_core` that is always-loaded.
+- **Small-to-medium project**: start with Addressables (best Editor workflow,
+  well-documented, supported by WX SDK). If catalog grows past 5 MB, reassess.
+- **Large project**: prefer AssetBundle loading directly. The WX SDK's
+  `bundlePathIdentifier` (default `StreamingAssets`) auto-triggers caching for
+  any URL containing that path segment.
+- Do NOT cache `.json` catalog/config files — the `bundleExcludeExtensions`
+  defaults to `.json` for this reason. On each new version, either change the
+  CDN path or set `no-cache` HTTP headers.
+- Single bundle ≤ 2 MB, concurrency ≤ 20 requests.
+- Show download progress UI; the WX cache system is transparent but network
+  still takes time.
+- Never duplicate an asset across packages; route shared assets into a core
+  package that is always-loaded.
 
 ## Alternatives Considered
 
-### Alternative 1: Use Unity Addressables
+### Alternative 1: Forbid Addressables (previous v1 position)
 
-- **Description**: Adopt the recommended Unity asset-loading system.
-- **Pros**: Mature, well-documented, mockable in Editor.
-- **Cons**: Addressables generates its own asset bundle layout with its own
-  catalog. WeChat subpackages are a separate, mutually-exclusive mechanism.
-  Running both produces broken references or asset duplication.
-- **Rejection Reason**: Platform-incompatible.
+- **Description**: Reject Addressables on the belief that it conflicts with
+  WeChat SubPackages.
+- **Pros**: Simplifies the decision.
+- **Cons**: Contradicts official WeChat documentation, which lists Addressables
+  as a supported loading mechanism. The WX SDK's file-cache system explicitly
+  handles Addressables paths. Removes the most Unity-idiomatic asset workflow.
+- **Rejection Reason**: Official docs confirm support. The catalog-size caveat
+  is real but manageable with a size gate.
 
 ### Alternative 2: `Resources.Load` / `Resources/` folder pattern
 
 - **Description**: Drop assets in `Resources/` and load by string name.
 - **Pros**: Trivial code path.
-- **Cons**: Every byte in `Resources/` ships in the first package. Blows the 4 MB cap.
-- **Rejection Reason**: Platform-incompatible with budget.
+- **Cons**: Every byte ships in the first package. Blows the 4 MB cap.
+- **Rejection Reason**: Budget-incompatible.
 
 ### Alternative 3: AssetBundle.LoadFromMemory
 
-- **Description**: Build asset bundles manually, load via raw bytes.
+- **Description**: Build bundles manually, load via raw bytes.
 - **Pros**: Full control.
-- **Cons**: Duplicates `wx.loadSubpackage`'s caching, has worse memory profile
-  (loads bundle into managed memory then duplicates into Unity heap), and is
-  forbidden by the technical-preferences "Forbidden Patterns" list.
-- **Rejection Reason**: Memory-pressure on a 256 MB-ceiling platform.
+- **Cons**: Duplicates the WX SDK's built-in caching; worse memory profile
+  (bundle in managed memory then duplicated into Unity heap). Forbidden by
+  technical-preferences.
+- **Rejection Reason**: Memory-pressure on 256 MB ceiling.
 
 ## Consequences
 
 ### Positive
 
-- Single, platform-native asset-loading model.
-- First-package budget remains controllable.
-- Subpackages are downloaded and cached by the WeChat client — no custom caching.
+- Addressables is available for small-to-medium projects (best Editor workflow).
+- AssetBundle path documented for large projects (no catalog bottleneck).
+- WX SDK auto-caching works for both paths — no custom caching layer needed.
+- `Resources/` pattern blocked from day one.
 
 ### Negative
 
-- Unity Editor playmode cannot reach a real WeChat client — the Tuanjie SDK's
-  `wx-runtime-editor.dll` Editor mock returns sensibly from `Wx.LoadSubpackage`
-  without actually downloading anything. This means Editor playmode does not
-  catch missing-asset errors that the WeChat client would catch.
-- Devs must learn the subpackage model.
+- Addressables → AssetBundle migration mid-project is non-trivial (refactors
+  all asset load calls). The catalog-size gate should trigger early.
+- Devs must understand three loading mechanisms (SubPackage, Addressables,
+  AssetBundle) and when to use each.
 
 ### Neutral
 
-- The `Addressables` and `unity-addressables-specialist` agent become advisory-only
-  on this template — flagged in the agent's frontmatter as REFUSE.
+- The `unity-addressables-specialist` agent is no longer REFUSE — it can be
+  consulted for Addressables-specific decisions with the catalog-size caveat.
 
 ## Risks
 
 | Risk | Probability | Impact | Mitigation |
 |------|------------|--------|-----------|
-| Someone adds `com.unity.addressables` to `manifest.json` | MEDIUM | HIGH | Add a CI grep gate that fails the build if the package appears. |
-| Cross-subpackage asset reference breaks at runtime | MEDIUM | HIGH | Run an asset-reference validator in CI that walks subpackage manifests. |
-| Subpackage download fails on flaky network | HIGH | MEDIUM | Mandatory retry-with-backoff in the caller (gameplay layer, not Facade); show user retry UI. |
+| Addressables catalog exceeds 5 MB and startup degrades | MEDIUM | MEDIUM | Measure catalog size on every CI build; fail if > 5 MB. Switch to AssetBundle if it stays high. |
+| Someone adds a `Resources/` folder | MEDIUM | HIGH | CI grep gate fails the build if `Resources/` exists under `Unity/Assets/`. |
+| Cross-package asset reference breaks at runtime | MEDIUM | HIGH | Asset-reference validator in CI walks package manifests. |
+| Download fails on flaky network | HIGH | MEDIUM | Retry-with-backoff in the caller (gameplay layer); show retry UI. |
 
 ## Performance Implications
 
 | Metric | Before | Expected After | Budget |
 |--------|--------|---------------|--------|
-| CPU (asset-load frame time) | n/a | < 1 ms per `LoadSubpackage` call (download is async) | < 1 ms |
-| Memory | n/a | ~ proportional to active subpackages (256 MB ceiling) | 256 MB total |
+| CPU (asset-load frame time) | n/a | < 1 ms per load call (download is async) | < 1 ms |
+| Memory | n/a | ~ proportional to active assets (256 MB ceiling) | 256 MB total |
 | Load Time (first scene) | n/a | First-paint ≤ 3 s; first MainMenu ≤ 6 s | ≤ 6 s |
-| Network (per subpackage) | n/a | ≤ 4 MB | 4 MB |
+| Network (per bundle) | n/a | ≤ 2 MB (single bundle recommendation) | 2 MB |
+| Addressables catalog size | n/a | ≤ 5 MB (gate threshold) | ≤ 5 MB |
 
 ## Migration Plan
 
 Greenfield. Implementation order:
 
-1. Create `subpackages.json` with one named subpackage: `subpackage_core`.
-2. Move the MainMenu scene into `subpackage_core`.
-3. Implement `Wx.LoadSubpackage` Facade method (ADR-0001 dependency).
-4. Loading scene calls `LoadSubpackage("subpackage_core")` then loads MainMenu.
-5. CI grep gate: `manifest.json` must not contain `addressables`; tree must not
-   contain a `Resources/` folder.
+1. Choose Addressables or AssetBundle based on projected content scale.
+2. If Addressables: add `com.unity.addressables` to manifest, configure groups.
+3. If AssetBundle: configure build scripts, set `bundlePathIdentifier` in
+   `MiniGameConfig.asset`.
+4. Move MainMenu scene out of first package.
+5. Loading scene loads first asset package, then MainMenu.
+6. CI gates: no `Resources/` folder; catalog size ≤ 5 MB (Addressables path).
 
-**Rollback plan**: Not rollback-able without changing platform.
+**Rollback plan for Addressables→AssetBundle**: refactor asset load calls from
+`Addressables.LoadAssetAsync<T>` to `UnityWebRequestAssetBundle`. Addressables
+groups map roughly to AssetBundle names. Documented as a known migration path.
 
 ## Validation Criteria
 
-- [ ] `Packages/manifest.json` does not contain `com.unity.addressables`.
 - [ ] No `Resources/` folder exists under `Unity/Assets/`.
-- [ ] First WebGL build produces multiple `.wxpkg` (or equivalent) files matching
-      `subpackages.json`.
-- [ ] EditMode test confirms `Wx.LoadSubpackage` invokes the SDK Editor mock
-      and calls `onSuccess`.
-- [ ] WebGL build on real WeChat client confirms `LoadSubpackage` downloads and
-      activates assets.
-- [ ] CI grep gate fails when Addressables or `Resources/` are reintroduced (negative test).
+- [ ] First WebGL build produces loadable assets outside the first package.
+- [ ] Editor playmode confirms assets load correctly via chosen mechanism.
+- [ ] WebGL build on real WeChat client confirms assets load and cache.
+- [ ] CI gate: `Resources/` folder → build fails.
+- [ ] CI gate (Addressables path): catalog > 5 MB → build warns (not fails).
 
 ## GDD Requirements Addressed
 
 | GDD Document | System | Requirement | How This ADR Satisfies It |
 |-------------|--------|-------------|--------------------------|
-| Foundational | Asset Pipeline | Game must respect WeChat's first-package budget while shipping full content | Subpackage model lets assets ship outside the first package without violating platform constraints. |
+| Foundational | Asset Pipeline | Game must respect WeChat's first-package budget while shipping full content | Assets ship outside first package via sanctioned WeChat-compatible loading mechanisms. |
 
 > Foundational — no GDD requirement. Enables: every content-bearing feature.
-> Without this ADR, gameplay content cannot ship at all.
 
 ## Related
 
 - ADR-0001 (the `Wx` Facade exposes `LoadSubpackage`)
-- ADR-0002 (first-package budget that drives the need for subpackages)
-- ADR-0006 (audio strategy uses a dedicated audio subpackage)
+- ADR-0002 (first-package budget)
+- ADR-0006 (audio assets live in a subpackage)
 - Forbidden patterns list in `.claude/docs/technical-preferences.md`
+- WeChat official docs: AssetDescription, FileCache, DataCDN, PerfOptimization
