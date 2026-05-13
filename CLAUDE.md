@@ -9,12 +9,13 @@ Each agent owns a specific domain, enforcing separation of concerns and quality.
 - **Language**: C# (.NET Standard 2.1, IL2CPP backend)
 - **Version Control**: Git with trunk-based development
 - **Build System**: Unity Build Pipeline → WebGL 2.0 → `minigame-tuanjie-transform-sdk` → `wx.*` runtime
-- **Asset Pipeline**: Unity AssetImporter (no Addressables — see ADR-0003) → WeChat SubPackages
+- **Asset Pipeline**: Unity AssetImporter → AssetBundle/Addressables (ADR-0003) or WeChat SubPackages
 
 > **Note**: This branch targets **WeChat Mini Game (微信小游戏)** via WebGL 2.0.
 > Engine specialists used: `unity-specialist`, `unity-shader-specialist`,
-> `unity-ui-specialist`. DOTS and Addressables specialists are forbidden on this
-> target — see `.claude/docs/technical-preferences.md`.
+> `unity-ui-specialist`. DOTS specialist is forbidden on this target; Addressables
+> specialist may be consulted with catalog-size caveat —
+> see `.claude/docs/technical-preferences.md`.
 
 ## Project Structure
 

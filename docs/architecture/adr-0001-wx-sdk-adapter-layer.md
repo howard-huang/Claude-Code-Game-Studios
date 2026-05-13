@@ -63,7 +63,7 @@ plumbing.
 | Field | Value |
 |-------|-------|
 | **Depends On** | None |
-| **Enables** | ADR-0003 (`Wx.LoadSubpackage` wraps `WeChatWASM.WX.LoadSubpackage`), ADR-0006 (`Wx.PlayBgm` wraps `WeChatWASM.WX.CreateInnerAudioContext`) |
+| **Enables** | ADR-0003 (`Wx.LoadSubpackage` wraps `WeChatWASM.WX.LoadSubpackage`), ADR-0006 (`Wx.PreDownloadAudios` wraps `WeChatWASM.WX.PreDownloadAudios`) |
 | **Blocks** | Any story that calls `WeChatWASM.WX.*` directly from gameplay code without going through `Wx` |
 | **Ordering Note** | This ADR must be Accepted before any subpackage or platform-audio story can start. |
 
@@ -325,14 +325,9 @@ the Facade yet.
 
 ## Follow-up Work
 
-- **ADR-0003** currently references "`wx.loadSubpackage` routed through
-  `WxBridge`"; update to "`WeChatWASM.WX.LoadSubpackage` wrapped by
-  `CCGS.Core.Platform.Wx.LoadSubpackage`".
-- **ADR-0006** currently references "`wx.createInnerAudioContext` via
-  `WxBridge`"; update to wrap via `Wx` Facade.
-- **`.claude/docs/technical-preferences.md` Forbidden Patterns**: add
-  `using WeChatWASM;` outside `Unity/Assets/Scripts/Core/Platform/` to the
-  forbidden list to enforce Facade discipline.
+- **ADR-0003** — ✅ COMPLETED (2026-05-13): updated per ADR-0003 rewrite; `Wx.LoadSubpackage` wraps `WeChatWASM.WX.LoadSubpackage`.
+- **ADR-0006** — ✅ COMPLETED (2026-05-13): updated per ADR-0006 rewrite; Unity AudioSource is primary, SDK auto-adapts; `Wx.PreDownloadAudios` is the only supplementary Facade method.
+- **`.claude/docs/technical-preferences.md` Forbidden Patterns** — ✅ COMPLETED (2026-05-13): added `using WeChatWASM;` outside `Unity/Assets/Scripts/Core/Platform/` to the forbidden list to enforce Facade discipline.
 - **`Unity/ProjectSettings/README.md`**: portrait-mobile target (720×1280)
   is project default — update default canvas size and add safe-area
   guidance for iOS. (Tracked separately from this ADR.)

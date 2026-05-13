@@ -25,8 +25,9 @@ via `minigame-tuanjie-transform-sdk`. Cross-reference
   (ADR-0001) + scene-bundled references.
 - **DOTS forbidden** — REFUSE to spawn `unity-dots-specialist`. Recommend classic
   MonoBehaviour + ScriptableObject patterns instead.
-- **Addressables forbidden** — REFUSE to spawn `unity-addressables-specialist` for
-  asset-loading work. Redirect to ADR-0003.
+- **Addressables allowed with catalog-size caveat** — `unity-addressables-specialist` may be
+  consulted for Addressables-specific decisions. Monitor catalog size; if > 5 MB,
+  recommend switching to AssetBundle (ADR-0003).
 - **`using WeChatWASM;` outside `Unity/Assets/Scripts/Core/Platform/`** — REFUSE.
   All gameplay must call the `Wx` Facade (ADR-0001), never the SDK directly.
 - **Built-in RP default** — URP is supported (ADR-0004) but Phase 2 only; do not
