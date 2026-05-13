@@ -26,8 +26,8 @@ if [ -f "design/gdd/game-concept.md" ]; then
 fi
 
 # Check if source code exists
-if [ -d "src" ]; then
-  SRC_CHECK=$(find src -type f \( -name "*.gd" -o -name "*.cs" -o -name "*.cpp" -o -name "*.c" -o -name "*.h" -o -name "*.hpp" -o -name "*.rs" -o -name "*.py" -o -name "*.js" -o -name "*.ts" \) 2>/dev/null | head -1)
+if [ -d "src/" ]; then
+  SRC_CHECK=$(find src/ -type f \( -name "*.gd" -o -name "*.cs" -o -name "*.cpp" -o -name "*.c" -o -name "*.h" -o -name "*.hpp" -o -name "*.rs" -o -name "*.py" -o -name "*.js" -o -name "*.ts" \) 2>/dev/null | head -1)
   if [ -n "$SRC_CHECK" ]; then
     FRESH_PROJECT=false
   fi
@@ -44,15 +44,15 @@ if [ "$FRESH_PROJECT" = true ]; then
 fi
 
 # --- Check 1: Substantial codebase but sparse design docs ---
-if [ -d "src" ]; then
+if [ -d "src/" ]; then
   # Count source files (cross-platform, handles Windows paths)
-  SRC_FILES=$(find src -type f \( -name "*.gd" -o -name "*.cs" -o -name "*.cpp" -o -name "*.c" -o -name "*.h" -o -name "*.hpp" -o -name "*.rs" -o -name "*.py" -o -name "*.js" -o -name "*.ts" \) 2>/dev/null | wc -l)
+  SRC_FILES=$(find src/ -type f \( -name "*.gd" -o -name "*.cs" -o -name "*.cpp" -o -name "*.c" -o -name "*.h" -o -name "*.hpp" -o -name "*.rs" -o -name "*.py" -o -name "*.js" -o -name "*.ts" \) 2>/dev/null | wc -l)
 else
   SRC_FILES=0
 fi
 
-if [ -d "design/gdd" ]; then
-  DESIGN_FILES=$(find design/gdd -type f -name "*.md" 2>/dev/null | wc -l)
+if [ -d "design/gdd/" ]; then
+  DESIGN_FILES=$(find design/gdd/ -type f -name "*.md" 2>/dev/null | wc -l)
 else
   DESIGN_FILES=0
 fi
@@ -68,8 +68,8 @@ if [ "$SRC_FILES" -gt 50 ] && [ "$DESIGN_FILES" -lt 5 ]; then
 fi
 
 # --- Check 2: Prototypes without documentation ---
-if [ -d "prototypes" ]; then
-  PROTOTYPE_DIRS=$(find prototypes -mindepth 1 -maxdepth 1 -type d 2>/dev/null)
+if [ -d "prototypes/" ]; then
+  PROTOTYPE_DIRS=$(find prototypes/ -mindepth 1 -maxdepth 1 -type d 2>/dev/null)
   UNDOCUMENTED_PROTOS=()
 
   if [ -n "$PROTOTYPE_DIRS" ]; then
@@ -95,12 +95,12 @@ if [ -d "prototypes" ]; then
 fi
 
 # --- Check 3: Core systems without architecture docs ---
-if [ -d "src/core" ] || [ -d "src/engine" ]; then
-  if [ ! -d "docs/architecture" ]; then
+if [ -d "src/core/" ] || [ -d "src/engine/" ]; then
+  if [ ! -d "docs/architecture/" ]; then
     echo "⚠️  GAP: Core engine/systems exist but no docs/architecture/ directory"
     echo "    Suggested action: Create docs/architecture/ and run /architecture-decision"
   else
-    ADR_COUNT=$(find docs/architecture -type f -name "*.md" 2>/dev/null | wc -l)
+    ADR_COUNT=$(find docs/architecture/ -type f -name "*.md" 2>/dev/null | wc -l)
     ADR_COUNT=$(echo "$ADR_COUNT" | tr -d ' ')
 
     if [ "$ADR_COUNT" -lt 3 ]; then
@@ -111,9 +111,9 @@ if [ -d "src/core" ] || [ -d "src/engine" ]; then
 fi
 
 # --- Check 4: Gameplay systems without design docs ---
-if [ -d "src/gameplay" ]; then
+if [ -d "src/gameplay/" ]; then
   # Find major gameplay subdirectories (those with 5+ files)
-  GAMEPLAY_SYSTEMS=$(find src/gameplay -mindepth 1 -maxdepth 1 -type d 2>/dev/null)
+  GAMEPLAY_SYSTEMS=$(find src/gameplay/ -mindepth 1 -maxdepth 1 -type d 2>/dev/null)
 
   if [ -n "$GAMEPLAY_SYSTEMS" ]; then
     while IFS= read -r system_dir; do
