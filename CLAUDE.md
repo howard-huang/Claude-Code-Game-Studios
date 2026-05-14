@@ -77,6 +77,21 @@ as the recommended path for light-to-medium projects.
   after exhaustive prompt-engineering attempts failed to override the bias.
   Addressables work is routed through `unity-specialist` with the caveat above.
 
+**Prompt-grounding workaround**: Testing confirms the bias is triggered mainly
+by open-ended "can I use..." questions. When the user's prompt provides explicit
+grounding (e.g., "Per ADR-0003, Addressables is officially supported — how do I
+configure groups for WeChat?"), agents produce correct implementation advice.
+Bias, when it appears, surfaces only in hedging language within explanations,
+not in the actual code patterns suggested.
+
+| Question style | Effect |
+|---|---|
+| "Can I use Addressables on WeChat?" | **Triggers bias** — agent may hedge or discourage |
+| "How do I set up Addressables for WeChat per ADR-0003?" | **Bypasses bias** — correct implementation guidance |
+
+> **Rule of thumb**: Don't ask "能不能用"; ask "怎么用" and embed ADR-0003
+> facts directly in the prompt.
+
 ---
 
 > This is the **unity-2021-instant-game** template branch. Run
