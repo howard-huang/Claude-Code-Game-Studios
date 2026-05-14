@@ -13,9 +13,8 @@ Each agent owns a specific domain, enforcing separation of concerns and quality.
 
 > **Note**: This branch targets **WeChat Mini Game (微信小游戏)** via WebGL 2.0.
 > Engine specialists used: `unity-specialist`, `unity-shader-specialist`,
-> `unity-ui-specialist`. DOTS specialist is forbidden on this target; Addressables
-> specialist may be consulted with catalog-size caveat —
-> see `.claude/docs/technical-preferences.md`.
+> `unity-ui-specialist`. DOTS specialist is forbidden on this target.
+> `unity-addressables-specialist` has been removed (see Known Issues below).
 
 ## Project Structure
 
@@ -55,6 +54,28 @@ See `docs/COLLABORATIVE-DESIGN-PRINCIPLE.md` for full protocol and examples.
 ## Context Management
 
 @.claude/docs/context-management.md
+
+## Known Issues
+
+### LLM Training-Data Bias: Addressables on WeChat Mini Game
+
+The underlying LLM (Claude Sonnet 4.6) carries a persistent training-data bias
+that Addressables and WeChat SubPackages are incompatible. This position was
+accurate in 2023–2024 but was reversed by official WeChat documentation
+(`UsingAddressable.html`) and ADR-0003 v2 (2026-05-12).
+
+**Impact**: When asked about Addressables on WeChat, agents may hedge
+("compatible but not recommended") or incorrectly recommend SubPackages as the
+primary loading mechanism. This contradicts ADR-0003, which lists Addressables
+as the recommended path for light-to-medium projects.
+
+**Mitigation**:
+- Always cross-check agent answers against ADR-0003.
+- Reference the official WeChat doc `UsingAddressable.html` for authoritative
+  Addressables guidance on this platform.
+- `unity-addressables-specialist` was removed from this target (2026-05-14)
+  after exhaustive prompt-engineering attempts failed to override the bias.
+  Addressables work is routed through `unity-specialist` with the caveat above.
 
 ---
 
