@@ -70,8 +70,9 @@ per-feature during integration testing.
 - **Shader**: `unity-shader-specialist`
 - **UI**: `unity-ui-specialist`
 - **REFUSE**: `unity-dots-specialist` (DOTS/Burst on WebGL is incomplete)
-- **REFUSE for asset loading**: `unity-addressables-specialist` (conflicts with
-  WeChat SubPackages — see ADR-0003)
+- **Addressables**: `unity-addressables-specialist` — available for
+  Addressables implementation (group design, loading patterns, memory lifecycle).
+  See ADR-0003 for the catalog-size gate and WeChat-specific patterns.
 
 ## Known Post-Cutoff Items to Verify
 
