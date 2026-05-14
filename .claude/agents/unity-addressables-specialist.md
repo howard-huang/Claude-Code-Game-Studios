@@ -149,6 +149,7 @@ handle.Completed += OnAssetLoaded;
 - Unload assets when transitioning between scenes/levels — never accumulate
 - Use `Addressables.GetDownloadSizeAsync()` to check before downloading remote content
 - Profile memory with Memory Profiler — set per-platform memory budgets:
+  - WeChat Mini Game (WebGL 2.0): < 256 MB total (shared with application heap)
   - Mobile: < 512 MB total asset memory
   - Console: < 2 GB total asset memory
   - PC: < 4 GB total asset memory
@@ -196,6 +197,122 @@ handle.Completed += OnAssetLoaded;
 - Hardcoding file paths instead of using Addressable addresses
 - Loading individual assets in a loop instead of batch loading with labels
 - Not preloading during loading screens (first-frame hitches in gameplay)
+
+## WeChat Mini Game — Addressables Patterns
+
+These patterns are specific to the WeChat Mini Game target. They come from the
+official WeChat docs (`UsingAddressable.html`) and override or extend the generic
+Unity patterns above.
+
+### First-Package Zip Budget
+
+The official WeChat docs measure the first package differently from the ADR-0002
+4 MB cap (which is raw/uncompressed):
+- **Zip-compressed** first resource package ≤ **5 MB**. **Ideal**: ~3 MB.
+- Most Unity built-in resources are text-based — they compress well (Brotli/gzip).
+- **Do not pack fonts** in the first package — they compress poorly.
+- **Do not include any scenes** in build settings other than the splash/loading scene.
+- Check the "Built-in" Addressable group — nothing in `Resources/` (it bakes into
+  the first package unconditionally).
+
+### WXAssetBundleProvider (iOS Memory)
+
+On iOS, replace the default Addressables Provider with `WXAssetBundleProvider` to
+reduce memory pressure. Without this, downloaded bundles consume more native memory
+on iOS than necessary.
+
+1. Download `WXAssetBundleProvider.cs` from the Tuanjie SDK demo repo
+   (`minigame-tuanjie-demo`, under `tools/`) and place it in
+   `WX-WASM-SDK-V2/Runtime/`.
+2. Add a `Unity.ResourceManager` assembly reference to `WX-WASM-SDK-V2/Runtime`
+   (the provider depends on it).
+3. In each Addressable group's settings, change the **Asset Bundle Provider** to
+   `WXAssetBundleProvider`.
+4. Rebuild Addressable bundles and re-export the mini game.
+
+Always recommend this for iOS-targeting WeChat projects using Addressables.
+
+### Scene-as-Group Pattern
+
+Make **each scene a separate Addressable group**. Load scenes dynamically with
+`Addressables.LoadSceneAsync()`:
+
+```csharp
+IEnumerator LoadScene() {
+    var handle = Addressables.LoadSceneAsync("Assets/Scenes/MainMenu.unity",
+        LoadSceneMode.Single, true);
+    handle.Completed += (obj) => Debug.Log($"Scene load: {obj.Status}");
+    while (!handle.IsDone) { yield return null; }
+}
+```
+
+When two scenes share assets (e.g. textures, materials), those assets will be
+duplicated in each scene's bundle. Use the dedup workflow below to fix this.
+
+### AssetReference (Avoid Prefab Dependency Preload)
+
+**Anti-pattern** in WeChat Mini Game:
+```csharp
+public GameObject somePrefab;
+void Start() { Instantiate(somePrefab); }
+```
+
+This forces the prefab AND all its dependencies to download before the scene's
+`Start()` runs, even if `Instantiate` is never called.
+
+**Correct pattern** with `AssetReference`:
+```csharp
+public AssetReference somePrefab;
+void Start() {
+    somePrefab.InstantiateAsync().Completed += (obj) => {
+        var instance = obj.Result;
+    };
+}
+```
+
+Set the prefab as Addressable in the Editor, then re-assign `somePrefab` to point
+to the Addressable reference. This defers all dependency loading until the
+`InstantiateAsync` call.
+
+### Async Loading: Coroutine and Async/Await
+
+Both Coroutine and `async/await` patterns work on WeChat for asset loading (the
+`Loading Patterns` section above shows both). The only WeChat-specific rule:
+`async/await` is allowed for asset loading but **NOT on hot paths** (per
+technical-preferences).
+
+### Deduplication Workflow (Analyze → Fix)
+
+After creating per-scene groups, shared assets will be duplicated across bundles.
+Use the built-in dedup tool:
+
+1. Open **Addressables Groups** window → **Tools** → **Analyze**.
+2. Select **Check Duplicate Bundle Dependencies**.
+3. Click **Fix Selected Rules** — Unity automatically marks duplicate assets as
+   standalone Addressables, pulling them into shared bundles.
+
+Run this after every group restructuring. Verify with the Bundle Layout Preview.
+
+### CDN Deployment
+
+- Addressables build output goes to `Library/com.unity.addressables/` at build
+  time, then Unity auto-copies bundles to the final WebGL output directory.
+- Upload the `StreamingAssets/` directory to CDN.
+- The WX SDK's file-cache system auto-caches Addressables bundles (detects
+  `StreamingAssets/aa/WebGL/` paths). No extra cache config needed.
+- **Do NOT cache `.json` catalog/config files** — `bundleExcludeExtensions` defaults
+  to `.json` for this reason. On version updates, either change the CDN path or
+  set `no-cache` HTTP headers for catalog files.
+- On CDN: enable **Brotli or gzip** for `.txt` suffix files (Unity text-based
+  resources).
+
+### Preload During Network Idle
+
+Use `wx.preload` (via the `Wx` Facade per ADR-0001) to pre-download upcoming
+Addressable bundles during network idle periods:
+- Rank groups by priority — preload high-priority bundles first.
+- Trigger preload after the first scene is fully interactive.
+- Track download progress and show optional indicator for large preloads.
 
 ## Coordination
 - Work with **unity-specialist** for overall Unity architecture
