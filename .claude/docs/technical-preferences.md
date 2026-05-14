@@ -111,9 +111,9 @@
 - **Additional Specialists**: (none — see Routing Notes for forbidden ones)
 - **Routing Notes**:
   - REFUSE to spawn `unity-dots-specialist` — DOTS/Burst on WebGL is incomplete.
-  - `unity-addressables-specialist` — **downgraded on WeChat target** (training-data
-    bias makes autonomous Addressables guidance unreliable; see agent file for
-    details). Route Addressables work through `unity-specialist`.
+  - `unity-addressables-specialist` — **removed from this target** (2026-05-14).
+    LLM training-data bias could not be overridden via prompt engineering.
+    Route Addressables work through `unity-specialist`.
 
 ### File Extension Routing
 

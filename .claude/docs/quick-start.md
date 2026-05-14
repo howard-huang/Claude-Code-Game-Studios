@@ -62,7 +62,7 @@ Ask yourself: "What department would handle this in a real studio?"
 | Build UMG/CommonUI widgets | `ue-umg-specialist` |
 | Design DOTS/ECS architecture | `unity-dots-specialist` |
 | Write Unity shaders/VFX | `unity-shader-specialist` |
-| Manage Addressable assets | `unity-addressables-specialist` |
+| Manage Addressable assets | `unity-specialist` (ADR-0003) |
 | Build UI Toolkit/UGUI screens | `unity-ui-specialist` |
 | Write idiomatic GDScript | `godot-gdscript-specialist` |
 | Create Godot shaders | `godot-shader-specialist` |

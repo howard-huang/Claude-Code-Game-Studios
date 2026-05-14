@@ -217,7 +217,7 @@ qa-tester, writer, world-builder
 
 **Agents**: godot-specialist, godot-gdscript-specialist, godot-csharp-specialist,
 godot-shader-specialist, godot-gdextension-specialist, unity-specialist, unity-ui-specialist,
-unity-shader-specialist, unity-dots-specialist, unity-addressables-specialist,
+unity-shader-specialist, unity-dots-specialist,
 unreal-specialist, ue-blueprint-specialist, ue-gas-specialist, ue-umg-specialist,
 ue-replication-specialist
 

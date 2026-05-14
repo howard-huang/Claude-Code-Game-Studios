@@ -40,7 +40,6 @@
     unity-specialist   -- Unity lead: MonoBehaviour/DOTS, Addressables, URP/HDRP
       unity-dots-specialist         -- DOTS/ECS: Jobs, Burst, hybrid renderer
       unity-shader-specialist       -- Shaders: Shader Graph, VFX Graph, SRP customization
-      unity-addressables-specialist -- Assets: async loading, bundles, memory, CDN
       unity-ui-specialist           -- UI: UI Toolkit, UGUI, UXML/USS, data binding
 
     godot-specialist   -- Godot 4 lead: GDScript, node/scene, signals, resources

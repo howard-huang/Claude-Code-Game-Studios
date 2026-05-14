@@ -70,9 +70,9 @@ per-feature during integration testing.
 - **Shader**: `unity-shader-specialist`
 - **UI**: `unity-ui-specialist`
 - **REFUSE**: `unity-dots-specialist` (DOTS/Burst on WebGL is incomplete)
-- **Addressables**: `unity-addressables-specialist` — available for
-  Addressables implementation (group design, loading patterns, memory lifecycle).
-  See ADR-0003 for the catalog-size gate and WeChat-specific patterns.
+- **Addressables**: handled by `unity-specialist` (ADR-0003). The
+  `unity-addressables-specialist` agent has been removed from this target due
+  to LLM training-data bias.
 
 ## Known Post-Cutoff Items to Verify
 

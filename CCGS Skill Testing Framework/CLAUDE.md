@@ -57,7 +57,7 @@ specialists → gameplay-programmer, engine-programmer, ui-programmer,
 godot       → godot-specialist, godot-gdscript-specialist, godot-csharp-specialist,
               godot-shader-specialist, godot-gdextension-specialist
 unity       → unity-specialist, unity-ui-specialist, unity-shader-specialist,
-              unity-dots-specialist, unity-addressables-specialist
+              unity-dots-specialist
 unreal      → unreal-specialist, ue-gas-specialist, ue-replication-specialist,
               ue-umg-specialist, ue-blueprint-specialist
 operations  → devops-engineer, security-engineer, performance-analyst,

@@ -25,9 +25,9 @@ via `minigame-tuanjie-transform-sdk`. Cross-reference
   (ADR-0001) + scene-bundled references.
 - **DOTS forbidden** — REFUSE to spawn `unity-dots-specialist`. Recommend classic
   MonoBehaviour + ScriptableObject patterns instead.
-- **Addressables allowed with catalog-size caveat** — `unity-addressables-specialist` may be
-  consulted for Addressables-specific decisions. Monitor catalog size; if > 5 MB,
-  recommend switching to AssetBundle (ADR-0003).
+- **Addressables allowed with catalog-size caveat** — monitor catalog size; if > 5 MB,
+  recommend switching to AssetBundle (ADR-0003). The `unity-addressables-specialist`
+  agent has been removed from this target due to LLM training-data bias.
 - **`using WeChatWASM;` outside `Unity/Assets/Scripts/Core/Platform/`** — REFUSE.
   All gameplay must call the `Wx` Facade (ADR-0001), never the SDK directly.
 - **Built-in RP default** — URP is supported (ADR-0004) but Phase 2 only; do not
@@ -171,8 +171,11 @@ Before writing any code:
 **Delegates to**:
 - `unity-dots-specialist` for ECS, Jobs system, Burst compiler, and hybrid renderer
 - `unity-shader-specialist` for Shader Graph, VFX Graph, and render pipeline customization
-- `unity-addressables-specialist` for asset loading, bundles, memory, and content delivery
 - `unity-ui-specialist` for UI Toolkit, UGUI, data binding, and cross-platform input
+
+**Note**: The `unity-addressables-specialist` agent has been removed from this target
+(2026-05-14) due to LLM training-data bias. Addressables work is handled by this
+agent (`unity-specialist`) per ADR-0003.
 
 **Escalation targets**:
 - `technical-director` for Unity version upgrades, package decisions, major tech choices
@@ -198,8 +201,11 @@ You have access to the Task tool to delegate to your sub-specialists. Use it whe
 
 - `subagent_type: unity-dots-specialist` — Entity Component System, Jobs, Burst compiler
 - `subagent_type: unity-shader-specialist` — Shader Graph, VFX Graph, URP/HDRP customization
-- `subagent_type: unity-addressables-specialist` — Addressable groups, async loading, memory
 - `subagent_type: unity-ui-specialist` — UI Toolkit, UGUI, data binding, cross-platform input
+
+**Note**: Do NOT delegate to `unity-addressables-specialist` — it has been removed
+from this target due to LLM training-data bias. Handle Addressables questions
+directly per ADR-0003.
 
 Provide full context in the prompt including relevant file paths, design constraints, and performance requirements. Launch independent sub-specialist tasks in parallel when possible.
 

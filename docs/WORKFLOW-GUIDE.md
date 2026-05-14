@@ -1378,7 +1378,6 @@ Reads existing code and generates GDD-format design documentation from it.
 | Unity-specific help | `unity-specialist` | 3 |
 | Unity DOTS/ECS | `unity-dots-specialist` | 3 |
 | Unity shaders/VFX | `unity-shader-specialist` | 3 |
-| Unity Addressables | `unity-addressables-specialist` | 3 |
 | Unity UI Toolkit | `unity-ui-specialist` | 3 |
 | Unreal-specific help | `unreal-specialist` | 3 |
 | Unreal GAS | `ue-gas-specialist` | 3 |

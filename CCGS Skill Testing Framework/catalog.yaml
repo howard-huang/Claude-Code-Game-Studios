@@ -995,12 +995,6 @@ agents:
     last_spec_result: ""
     category: engine
 
-  - name: unity-addressables-specialist
-    spec: CCGS Skill Testing Framework/agents/engine/unity/unity-addressables-specialist.md
-    last_spec: ""
-    last_spec_result: ""
-    category: engine
-
   # Engine Specialists — Unreal
   - name: unreal-specialist
     spec: CCGS Skill Testing Framework/agents/engine/unreal/unreal-specialist.md

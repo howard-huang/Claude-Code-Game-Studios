@@ -16,7 +16,9 @@ Accepted
 
 - `technical-director` (architecture authority)
 - `unity-specialist` (Unity build pipeline)
-- `unity-addressables-specialist` (consulted on catalog-size constraints)
+- `unity-specialist` (Unity build pipeline; `unity-addressables-specialist` was
+  consulted during ADR drafting but has been removed from this target due to LLM
+  training-data bias — see agent file)
 
 ## Summary
 
@@ -242,8 +244,9 @@ var bundle = DownloadHandlerAssetBundle.GetContent(request);
 
 ### Neutral
 
-- The `unity-addressables-specialist` agent is no longer REFUSE — it can be
-  consulted for Addressables-specific decisions with the catalog-size caveat.
+- The `unity-addressables-specialist` agent was removed from this target (2026-05-14)
+  due to LLM training-data bias that could not be overridden via prompt engineering.
+  Addressables guidance is handled by `unity-specialist` (see ADR-0003).
 
 ## Risks
 
